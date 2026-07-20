@@ -6,11 +6,8 @@ import type {
 } from "@/app/admin/types";
 
 import {
-  formatDateTime,
-  formatPrice,
-  getStatusClass,
-  orderContainsWaitingProduct,
-} from "@/app/admin/helpers";
+  ORDER_STATUSES,
+} from "@/app/admin/types";
 
 type OrderCardProps = {
   order: Order;
@@ -22,13 +19,59 @@ type OrderCardProps = {
   onDelete: (order: Order) => void;
 };
 
-const ORDER_STATUSES: OrderStatus[] = [
-  "Ny",
-  "Bekräftad",
-  "Planerad",
-  "Levererad",
-  "Avbruten",
-];
+function formatPrice(
+  value:
+    | number
+    | string
+    | null
+    | undefined,
+) {
+  const number = Number(value ?? 0);
+
+  return new Intl.NumberFormat("sv-SE", {
+    style: "currency",
+    currency: "SEK",
+    maximumFractionDigits: 0,
+  }).format(
+    Number.isFinite(number) ? number : 0,
+  );
+}
+
+function formatDateTime(
+  value: string | null | undefined,
+) {
+  if (!value) {
+    return "Datum saknas";
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat(
+    "sv-SE",
+    {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    },
+  ).format(date);
+}
+
+function getStatusClass(
+  status: string,
+) {
+  return status
+    .toLocaleLowerCase("sv-SE")
+    .replaceAll("å", "a")
+    .replaceAll("ä", "a")
+    .replaceAll("ö", "o")
+    .replaceAll(" ", "-");
+}
 
 export default function OrderCard({
   order,
@@ -36,20 +79,27 @@ export default function OrderCard({
   onStatusChange,
   onDelete,
 }: OrderCardProps) {
-  const waitingForProduct =
-    orderContainsWaitingProduct(order);
+  const address = [
+    order.street_address,
+    `${order.postal_code ?? ""} ${
+      order.city ?? ""
+    }`.trim(),
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   return (
-    <article className="order-card">
-      <div className="order-card-top">
+    <article className="modern-order-card">
+      <header className="modern-order-header">
         <div>
-          <span className="order-number">
+          <p className="modern-order-number">
             {order.order_number}
-          </span>
+          </p>
 
-          <h2>{order.customer_name}</h2>
+          <h3>{order.customer_name}</h3>
 
-          <p>
+          <p className="modern-order-created">
+            Beställd{" "}
             {formatDateTime(
               order.created_at,
             )}
@@ -57,99 +107,112 @@ export default function OrderCard({
         </div>
 
         <span
-          className={`status-badge status-${getStatusClass(
+          className={`modern-status modern-status-${getStatusClass(
             order.status,
           )}`}
         >
           {order.status}
         </span>
-      </div>
+      </header>
 
-      {waitingForProduct && (
-        <div className="waiting-order-notice">
-          ⏳ Kunden har beställt en
-          produkt som är tillfälligt
-          slut
-        </div>
-      )}
-
-      <div className="order-address">
-        <strong>
-          Leveransadress
-        </strong>
-
-        <span>
-          {order.street_address}
-        </span>
-
-        <span>
-          {order.postal_code}{" "}
-          {order.city}
-        </span>
-      </div>
-
-      <div className="order-contact">
+      <div className="modern-order-information">
         <a href={`tel:${order.phone}`}>
-          📞 {order.phone}
+          <span>📞</span>
+
+          <strong>
+            {order.phone}
+          </strong>
         </a>
 
         {order.email && (
-          <a
-            href={`mailto:${order.email}`}
-          >
-            ✉️ {order.email}
+          <a href={`mailto:${order.email}`}>
+            <span>✉️</span>
+
+            <strong>
+              {order.email}
+            </strong>
           </a>
         )}
+
+        <p>
+          <span>📍</span>
+
+          <strong>{address}</strong>
+        </p>
       </div>
 
-      <div className="order-card-summary">
-        <span>
-          {order.total_items} st
-        </span>
+      <div className="modern-order-summary">
+        <div>
+          <span>Produkter</span>
 
-        <strong>
-          {formatPrice(
-            order.total_price,
-          )}
-        </strong>
+          <strong>
+            {Number(
+              order.total_items ?? 0,
+            )}{" "}
+            st
+          </strong>
+        </div>
+
+        <div>
+          <span>Ordervärde</span>
+
+          <strong>
+            {formatPrice(
+              order.total_price,
+            )}
+          </strong>
+        </div>
+
+        <div>
+          <span>Leverans</span>
+
+          <strong>
+            {order.delivery_date ||
+              "Inte planerad"}
+          </strong>
+        </div>
       </div>
 
-      <div className="order-card-actions">
+      <div className="modern-order-actions">
         <button
           type="button"
+          className="modern-primary-button"
           onClick={() =>
             onOpen(order)
           }
         >
-          Visa order
+          Visa hela ordern
         </button>
 
-        <select
-          value={order.status}
-          aria-label={`Ändra status för ${order.order_number}`}
-          onChange={(event) =>
-            onStatusChange(
-              order.id,
-              event.target
-                .value as OrderStatus,
-            )
-          }
-        >
-          {ORDER_STATUSES.map(
-            (status) => (
-              <option
-                key={status}
-                value={status}
-              >
-                {status}
-              </option>
-            ),
-          )}
-        </select>
+        <label className="modern-status-select">
+          <span>Ändra status</span>
+
+          <select
+            value={order.status}
+            onChange={(event) =>
+              onStatusChange(
+                order.id,
+                event.target
+                  .value as OrderStatus,
+              )
+            }
+          >
+            {ORDER_STATUSES.map(
+              (status) => (
+                <option
+                  key={status}
+                  value={status}
+                >
+                  {status}
+                </option>
+              ),
+            )}
+          </select>
+        </label>
 
         <button
           type="button"
-          className="danger-button"
+          className="modern-delete-button"
           onClick={() =>
             onDelete(order)
           }
