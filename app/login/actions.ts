@@ -2,23 +2,48 @@
 
 import { redirect } from "next/navigation";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from
+  "@/lib/supabase/server";
 
 export type LoginState = {
   error: string | null;
 };
 
 export async function login(
-  _previousState: LoginState,
-  formData: FormData,
+  previousState: LoginState,
+  formData: FormData
 ): Promise<LoginState> {
-  const email = String(
-    formData.get("email") ?? "",
-  ).trim();
+  void previousState;
 
-  const password = String(
-    formData.get("password") ?? "",
-  );
+  const emailValue =
+    formData.get("email");
+
+  const passwordValue =
+    formData.get("password");
+
+  const redirectValue =
+    formData.get("redirect");
+
+  const email =
+    typeof emailValue === "string"
+      ? emailValue.trim()
+      : "";
+
+  const password =
+    typeof passwordValue === "string"
+      ? passwordValue
+      : "";
+
+  const requestedRedirect =
+    typeof redirectValue === "string"
+      ? redirectValue
+      : "/admin";
+
+  const redirectPath =
+    requestedRedirect.startsWith("/") &&
+    !requestedRedirect.startsWith("//")
+      ? requestedRedirect
+      : "/admin";
 
   if (!email || !password) {
     return {
@@ -27,8 +52,7 @@ export async function login(
     };
   }
 
-  const supabase =
-    await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const { error } =
     await supabase.auth.signInWithPassword({
@@ -41,14 +65,6 @@ export async function login(
       error:
         "Fel e-postadress eller lösenord.",
     };
-  }
-
-  const redirectPath = String(
-    formData.get("redirect") ?? "/admin",
-  );
-
-  if (!redirectPath.startsWith("/admin")) {
-    redirect("/admin");
   }
 
   redirect(redirectPath);

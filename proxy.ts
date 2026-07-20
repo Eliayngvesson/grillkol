@@ -1,16 +1,20 @@
 import type { NextRequest } from "next/server";
 
-import { updateSession } from "@/lib/supabase/proxy";
+import { updateSession } from
+  "./lib/supabase/proxy";
 
 export async function proxy(
-  request: NextRequest,
+  request: NextRequest
 ) {
   return updateSession(request);
 }
 
 export const config = {
   matcher: [
-    "/admin/:path*",
-    "/login",
+    /*
+     * Kör inte proxy för statiska filer,
+     * bilder eller favicon.
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

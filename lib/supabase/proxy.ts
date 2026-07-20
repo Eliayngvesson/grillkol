@@ -5,26 +5,15 @@ import {
 } from "next/server";
 
 export async function updateSession(
-  request: NextRequest,
+  request: NextRequest
 ) {
   let response = NextResponse.next({
     request,
   });
 
-  const supabaseUrl =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const supabasePublishableKey =
-    process.env
-      .NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-
-  if (!supabaseUrl || !supabasePublishableKey) {
-    return response;
-  }
-
   const supabase = createServerClient(
-    supabaseUrl,
-    supabasePublishableKey,
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
     {
       cookies: {
         getAll() {
@@ -35,7 +24,7 @@ export async function updateSession(
           cookiesToSet.forEach(
             ({ name, value }) => {
               request.cookies.set(name, value);
-            },
+            }
           );
 
           response = NextResponse.next({
@@ -47,48 +36,49 @@ export async function updateSession(
               response.cookies.set(
                 name,
                 value,
-                options,
+                options
               );
-            },
+            }
           );
         },
       },
-    },
+    }
   );
 
+  /*
+   * Viktigt:
+   * Använd getUser() för att kontrollera sessionen
+   * mot Supabase-servern.
+   */
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const pathname = request.nextUrl.pathname;
+
   const isAdminRoute =
-    request.nextUrl.pathname.startsWith(
-      "/admin",
-    );
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/");
 
   if (isAdminRoute && !user) {
-    const loginUrl =
-      request.nextUrl.clone();
+    const loginUrl = request.nextUrl.clone();
 
     loginUrl.pathname = "/login";
     loginUrl.searchParams.set(
       "redirect",
-      request.nextUrl.pathname,
+      `${pathname}${request.nextUrl.search}`
     );
 
-    return NextResponse.redirect(loginUrl);
-  }
+    const redirectResponse =
+      NextResponse.redirect(loginUrl);
 
-  const isLoginRoute =
-    request.nextUrl.pathname === "/login";
+    response.cookies
+      .getAll()
+      .forEach((cookie) => {
+        redirectResponse.cookies.set(cookie);
+      });
 
-  if (isLoginRoute && user) {
-    const adminUrl =
-      request.nextUrl.clone();
-
-    adminUrl.pathname = "/admin";
-    adminUrl.search = "";
-
-    return NextResponse.redirect(adminUrl);
+    return redirectResponse;
   }
 
   return response;

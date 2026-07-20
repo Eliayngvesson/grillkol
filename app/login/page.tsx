@@ -1,79 +1,51 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useActionState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { createClient } from
+  "@/lib/supabase/server";
 
-import { login, type LoginState } from "./actions";
+import LoginForm from "./login-form";
 import styles from "./page.module.css";
 
-const initialState: LoginState = {
-  error: null,
+type LoginPageProps = {
+  searchParams: Promise<{
+    redirect?: string;
+  }>;
 };
 
-function LoginForm() {
-  const searchParams = useSearchParams();
+export default async function LoginPage({
+  searchParams,
+}: LoginPageProps) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const params = await searchParams;
+
+  const requestedRedirect =
+    params.redirect ?? "/admin";
 
   const redirectPath =
-    searchParams.get("redirect") ?? "/admin";
+    requestedRedirect.startsWith("/") &&
+    !requestedRedirect.startsWith("//")
+      ? requestedRedirect
+      : "/admin";
 
-  const [state, formAction, isPending] =
-    useActionState(login, initialState);
+  /*
+   * Är användaren redan inloggad skickas
+   * den direkt till administrationen.
+   */
+  if (user) {
+    redirect(redirectPath);
+  }
 
-  return (
-    <form
-      action={formAction}
-      className={styles.form}
-    >
-      <input
-        type="hidden"
-        name="redirect"
-        value={redirectPath}
-      />
-
-      <label className={styles.field}>
-        <span>E-postadress</span>
-
-        <input
-          type="email"
-          name="email"
-          required
-        />
-      </label>
-
-      <label className={styles.field}>
-        <span>Lösenord</span>
-
-        <input
-          type="password"
-          name="password"
-          required
-        />
-      </label>
-
-      {state.error && (
-        <p className={styles.error}>
-          {state.error}
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={isPending}
-        className={styles.button}
-      >
-        {isPending
-          ? "Loggar in..."
-          : "Logga in"}
-      </button>
-    </form>
-  );
-}
-
-export default function LoginPage() {
   return (
     <main className={styles.page}>
       <section className={styles.card}>
-        <div className={styles.logo}>🔥</div>
+        <div className={styles.logo}>
+          🔥
+        </div>
 
         <p className={styles.eyebrow}>
           Grillkolsbutiken
@@ -82,12 +54,13 @@ export default function LoginPage() {
         <h1>Logga in</h1>
 
         <p className={styles.description}>
-          Logga in för att öppna administrationen.
+          Logga in för att öppna
+          administrationen.
         </p>
 
-        <Suspense fallback={<p>Laddar...</p>}>
-          <LoginForm />
-        </Suspense>
+        <LoginForm
+          redirectPath={redirectPath}
+        />
 
         <a
           href="/"

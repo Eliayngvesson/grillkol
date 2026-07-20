@@ -1,41 +1,54 @@
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
-import { createServerSupabaseClient } from "@/lib/supabase/server";
+import { createClient } from
+  "@/lib/supabase/server";
 
 import { logout } from "./actions";
-
-import styles from "./admin-layout.module.css";
+import styles from
+  "./admin-layout.module.css";
 
 type AdminLayoutProps = {
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 export default async function AdminLayout({
   children,
 }: AdminLayoutProps) {
-  const supabase =
-    await createServerSupabaseClient();
+  const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
+  /*
+   * Extra serverskydd.
+   * Även om proxy skulle misslyckas skyddas
+   * själva admin-layouten här.
+   */
   if (!user) {
-    redirect("/login");
+    redirect(
+      "/login?redirect=/admin"
+    );
   }
 
   return (
-    <div className={styles.adminWrapper}>
-      <div className={styles.accountBar}>
-        <div className={styles.accountInformation}>
-          <span className={styles.statusDot} />
-
-          <span>
-            Inloggad som{" "}
-            <strong>
-              {user.email ?? "administratör"}
-            </strong>
+    <div className={styles.admin}>
+      <header className={styles.topbar}>
+        <div className={styles.account}>
+          <span className={styles.fire}>
+            🔥
           </span>
+
+          <div>
+            <strong>
+              Administration
+            </strong>
+
+            <span className={styles.email}>
+              {user.email}
+            </span>
+          </div>
         </div>
 
         <form action={logout}>
@@ -46,9 +59,11 @@ export default async function AdminLayout({
             Logga ut
           </button>
         </form>
-      </div>
+      </header>
 
-      {children}
+      <div className={styles.content}>
+        {children}
+      </div>
     </div>
   );
 }
