@@ -25,6 +25,7 @@ import {
 
 import OrderCard from "./OrderCard";
 import OrderModal from "./OrderModal";
+import PdfButtons from "./PdfButtons";
 
 type OrdersTabProps = {
   onOrderCountChange?: (
@@ -639,6 +640,8 @@ export default function OrdersTab({
           )}
         </div>
       </div>
+
+      <PdfButtons orders={orders} />
 
       {loading ? (
         <div className="admin-empty">
