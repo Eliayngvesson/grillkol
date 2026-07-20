@@ -1,0 +1,322 @@
+.page {
+  min-height: 100vh;
+  padding: 30px;
+  background:
+    radial-gradient(circle at top, #3b3129, #171412 55%, #0c0b0a);
+  color: #ffffff;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.header,
+.summary,
+.panel,
+.twoColumns,
+.error {
+  width: min(1200px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.header {
+  margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+}
+
+.header h1 {
+  margin: 5px 0 8px;
+  font-size: clamp(30px, 5vw, 48px);
+}
+
+.header p {
+  margin: 0;
+  color: #c9c0b8;
+}
+
+.eyebrow {
+  margin: 0 !important;
+  color: #ef6a27 !important;
+  font-size: 11px !important;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.headerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.headerActions a,
+.headerActions button {
+  min-height: 42px;
+  padding: 0 14px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #66564b;
+  border-radius: 8px;
+  background: #28221e;
+  color: #ffffff;
+  font-weight: 800;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.summary {
+  margin-bottom: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summary article {
+  min-height: 105px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  border: 1px solid #4c423a;
+  border-radius: 12px;
+  background: linear-gradient(145deg, #2b2521, #191614);
+}
+
+.summary span {
+  color: #bdb4ac;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summary strong {
+  font-size: 23px;
+}
+
+.panel {
+  margin-bottom: 18px;
+  padding: 22px;
+  border: 1px solid #d8d0c8;
+  border-radius: 14px;
+  background: #ffffff;
+  color: #211e1a;
+  box-shadow: 0 16px 35px rgba(0, 0, 0, 0.22);
+}
+
+.panelHeading {
+  margin-bottom: 20px;
+}
+
+.panelHeading h2 {
+  margin: 5px 0 0;
+}
+
+.twoColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.twoColumns .panel {
+  width: auto;
+  margin: 0 0 18px;
+}
+
+.monthChart {
+  min-height: 280px;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(70px, 1fr));
+  align-items: end;
+  gap: 12px;
+  overflow-x: auto;
+}
+
+.monthColumn {
+  min-width: 70px;
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+}
+
+.monthColumn > strong {
+  font-size: 11px;
+}
+
+.monthColumn > span {
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: capitalize;
+}
+
+.monthColumn > small {
+  color: #746c64;
+}
+
+.barTrack {
+  width: 45px;
+  height: 190px;
+  display: flex;
+  align-items: end;
+  border-radius: 9px;
+  background: #ece6df;
+  overflow: hidden;
+}
+
+.bar {
+  width: 100%;
+  min-height: 4px;
+  border-radius: 9px 9px 0 0;
+  background: linear-gradient(180deg, #f16a27, #d94a08);
+}
+
+.ranking {
+  display: grid;
+  gap: 12px;
+}
+
+.ranking > div {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.rank,
+.simpleList > div > span {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #28221e;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.rankingContent {
+  display: grid;
+  gap: 8px;
+}
+
+.rankingContent > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rankingContent small {
+  color: #746c64;
+}
+
+.progressTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: #ece6df;
+  overflow: hidden;
+}
+
+.progress {
+  height: 100%;
+  border-radius: 999px;
+  background: #ef6a27;
+}
+
+.simpleList {
+  display: grid;
+  gap: 9px;
+}
+
+.simpleList > div {
+  padding: 11px;
+  display: grid;
+  grid-template-columns: 34px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  border-radius: 8px;
+  background: #f2eee9;
+}
+
+.simpleList > div > div {
+  display: grid;
+  gap: 4px;
+}
+
+.simpleList small {
+  color: #746c64;
+}
+
+.simpleList b {
+  color: #db4d09;
+}
+
+.statusGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.statusGrid > div {
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: 8px;
+  background: #f2eee9;
+}
+
+.statusGrid strong {
+  color: #db4d09;
+  font-size: 22px;
+}
+
+.error {
+  margin-bottom: 18px;
+  padding: 15px;
+  border: 1px solid #cc796d;
+  border-radius: 10px;
+  background: #fff0ed;
+  color: #842b20;
+  font-weight: 800;
+}
+
+.empty {
+  width: min(1200px, 100%);
+  min-height: 300px;
+  margin: 0 auto;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  border-radius: 14px;
+  background: #f5f1eb;
+  color: #28231f;
+}
+
+.empty > span {
+  font-size: 46px;
+}
+
+@media (max-width: 850px) {
+  .summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .twoColumns {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .page {
+    padding: 18px 12px;
+  }
+
+  .header {
+    display: grid;
+  }
+
+  .summary,
+  .statusGrid {
+    grid-template-columns: 1fr;
+  }
+}

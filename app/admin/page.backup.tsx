@@ -147,19 +147,6 @@ export default function AdminPage() {
 
             <span>Leveranser</span>
           </Link>
-
-          <Link
-            href="/admin/forare"
-            className={styles.navigationLink}
-          >
-            <span
-              className={styles.navigationIcon}
-            >
-              🚛
-            </span>
-
-            <span>Förarmeny</span>
-          </Link>
         </nav>
 
         <div className={styles.content}>
@@ -182,9 +169,9 @@ export default function AdminPage() {
 
                   <p>
                     Här hanterar du
-                    beställningar, produkter,
-                    leveranser och förarmenyn
-                    från en och samma plats.
+                    beställningar, produkter
+                    och leveranser från en och
+                    samma plats.
                   </p>
                 </div>
 
@@ -267,28 +254,6 @@ export default function AdminPage() {
                   >
                     <span>
                       Leveransplanering
-                    </span>
-
-                    <strong>Aktiv</strong>
-                  </div>
-                </article>
-
-                <article
-                  className={styles.statCard}
-                >
-                  <div
-                    className={styles.statIcon}
-                  >
-                    🚛
-                  </div>
-
-                  <div
-                    className={
-                      styles.statInformation
-                    }
-                  >
-                    <span>
-                      Förarmeny
                     </span>
 
                     <strong>Aktiv</strong>
@@ -407,35 +372,6 @@ export default function AdminPage() {
                       </span>
                     </span>
                   </Link>
-
-                  <Link
-                    href="/admin/forare"
-                    className={styles.quickLink}
-                  >
-                    <span
-                      className={
-                        styles.quickIcon
-                      }
-                    >
-                      🚛
-                    </span>
-
-                    <span
-                      className={
-                        styles.quickText
-                      }
-                    >
-                      <strong>
-                        Öppna förarmenyn
-                      </strong>
-
-                      <span>
-                        Visa dagens leveranser,
-                        navigera, ring kunden
-                        och uppdatera status.
-                      </span>
-                    </span>
-                  </Link>
                 </div>
               </section>
 
@@ -519,22 +455,6 @@ export default function AdminPage() {
                     <small>
                       Skapa och öppna rutter i
                       Google Maps.
-                    </small>
-                  </article>
-
-                  <article
-                    className={
-                      styles.functionCard
-                    }
-                  >
-                    <span>🚛</span>
-                    <strong>
-                      Förarmeny
-                    </strong>
-                    <small>
-                      Mobilvy för navigering,
-                      kundkontakt och
-                      leveransstatus.
                     </small>
                   </article>
                 </div>
