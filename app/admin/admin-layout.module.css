@@ -1,37 +1,67 @@
-.accountBar {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px 10px 16px;
-  border: 1px solid
-    rgba(255, 255, 255, 0.12);
-  border-radius: 14px;
-  background:
-    rgba(25, 25, 23, 0.96);
-  box-shadow:
-    0 12px 40px
-    rgba(0, 0, 0, 0.3);
-  color: #ffffff;
+.adminWrapper {
+  min-height: 100vh;
 }
 
-.user {
-  font-size: 13px;
+.accountBar {
+  position: sticky;
+  top: 0;
+  z-index: 99999;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  width: 100%;
+  padding: 12px 20px;
+
+  border-bottom: 1px solid
+    rgba(255, 255, 255, 0.12);
+
+  background: #1f1f1c;
+  color: #ffffff;
+
+  box-shadow:
+    0 4px 16px
+    rgba(0, 0, 0, 0.22);
+}
+
+.accountInformation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  font-size: 14px;
+}
+
+.statusDot {
+  width: 10px;
+  height: 10px;
+
+  flex-shrink: 0;
+
+  border-radius: 50%;
+  background: #31c46c;
+
+  box-shadow:
+    0 0 0 4px
+    rgba(49, 196, 108, 0.14);
 }
 
 .logoutButton {
-  min-height: 38px;
-  padding: 0 14px;
+  min-height: 42px;
+  padding: 0 18px;
+
   border: 0;
-  border-radius: 9px;
+  border-radius: 10px;
+
   background: #ef7321;
   color: #ffffff;
+
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 800;
+
   cursor: pointer;
 }
 
@@ -39,18 +69,28 @@
   background: #d96017;
 }
 
+.logoutButton:active {
+  transform: translateY(1px);
+}
+
 @media (max-width: 650px) {
   .accountBar {
-    right: 10px;
-    bottom: 10px;
-    left: 10px;
-    justify-content: space-between;
+    padding: 10px 12px;
   }
 
-  .user {
+  .accountInformation {
     overflow: hidden;
-    max-width: 220px;
+    max-width: calc(100% - 110px);
+  }
+
+  .accountInformation span:last-child {
+    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  .logoutButton {
+    min-height: 40px;
+    padding: 0 14px;
   }
 }

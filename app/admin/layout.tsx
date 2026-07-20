@@ -25,14 +25,18 @@ export default async function AdminLayout({
   }
 
   return (
-    <>
+    <div className={styles.adminWrapper}>
       <div className={styles.accountBar}>
-        <span className={styles.user}>
-          Inloggad som{" "}
-          <strong>
-            {user.email ?? "administratör"}
-          </strong>
-        </span>
+        <div className={styles.accountInformation}>
+          <span className={styles.statusDot} />
+
+          <span>
+            Inloggad som{" "}
+            <strong>
+              {user.email ?? "administratör"}
+            </strong>
+          </span>
+        </div>
 
         <form action={logout}>
           <button
@@ -45,6 +49,6 @@ export default async function AdminLayout({
       </div>
 
       {children}
-    </>
+    </div>
   );
 }
