@@ -16,8 +16,21 @@ import "./products.css";
 const IMAGE_BUCKET = "product-images";
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
 
+type ProductId = number | string;
+
+type ProductVariant = {
+  id: number;
+  product_id: ProductId;
+  name: string;
+  price: number;
+  stock_quantity: number;
+  sku: string | null;
+  active: boolean;
+  sort_order: number;
+};
+
 type Product = {
-  id: number | string;
+  id: ProductId;
   name: string;
   description: string | null;
   price: number;
@@ -27,34 +40,66 @@ type Product = {
   available: boolean;
   active: boolean;
   sort_order: number;
+  product_variants: ProductVariant[];
+};
+
+type VariantDraft = {
+  localId: string;
+  id: number | null;
+  name: string;
+  price: string;
+  stockQuantity: string;
+  sku: string;
+  active: boolean;
+  sortOrder: string;
 };
 
 type ProductsTabProps = {
   onProductCountChange?: (count: number) => void;
 };
 
-function createSafeFileName(file: File) {
-  const extension =
-    file.name.split(".").pop()?.toLowerCase() || "jpg";
-
-  const baseName = file.name
-    .replace(/\.[^/.]+$/, "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 50);
-
-  const uniquePart =
+function createLocalId() {
+  if (
     typeof crypto !== "undefined" &&
     typeof crypto.randomUUID === "function"
-      ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}`;
+  ) {
+    return crypto.randomUUID();
+  }
 
-  return `${baseName || "produkt"}-${uniquePart}.${extension}`;
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+function createEmptyVariant(index = 0): VariantDraft {
+  return {
+    localId: createLocalId(),
+    id: null,
+    name: "",
+    price: "",
+    stockQuantity: "0",
+    sku: "",
+    active: true,
+    sortOrder: String(index),
+  };
+}
+
+function variantToDraft(variant: ProductVariant): VariantDraft {
+  return {
+    localId: `saved-${variant.id}`,
+    id: variant.id,
+    name: variant.name,
+    price: String(variant.price),
+    stockQuantity: String(variant.stock_quantity ?? 0),
+    sku: variant.sku ?? "",
+    active: variant.active,
+    sortOrder: String(variant.sort_order ?? 0),
+  };
+}
+
+function formatPrice(value: number) {
+  return Number(value).toLocaleString("sv-SE", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  });
 }
 
 function validateImage(file: File) {
@@ -75,23 +120,40 @@ function validateImage(file: File) {
   return null;
 }
 
+function createSafeFileName(file: File) {
+  const extension =
+    file.name.split(".").pop()?.toLowerCase() || "jpg";
+
+  const baseName = file.name
+    .replace(/\.[^/.]+$/, "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 50);
+
+  return `${baseName || "produkt"}-${createLocalId()}.${extension}`;
+}
+
 export default function ProductsTab({
   onProductCountChange,
 }: ProductsTabProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [products, setProducts] = useState<Product[]>([]);
-
   const [editingProduct, setEditingProduct] =
     useState<Product | null>(null);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState("");
-  const [weight, setWeight] = useState("");
   const [sortOrder, setSortOrder] = useState("0");
   const [available, setAvailable] = useState(true);
   const [active, setActive] = useState(true);
+
+  const [variants, setVariants] = useState<VariantDraft[]>([
+    createEmptyVariant(),
+  ]);
 
   const [selectedImage, setSelectedImage] =
     useState<File | null>(null);
@@ -111,9 +173,8 @@ export default function ProductsTab({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const [busyProductId, setBusyProductId] = useState<
-    Product["id"] | null
-  >(null);
+  const [busyProductId, setBusyProductId] =
+    useState<ProductId | null>(null);
 
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
@@ -126,20 +187,28 @@ export default function ProductsTab({
 
     const { data, error } = await supabase
       .from("products")
-      .select(
-        `
+      .select(`
+        id,
+        name,
+        description,
+        price,
+        weight,
+        image_url,
+        image_path,
+        available,
+        active,
+        sort_order,
+        product_variants (
           id,
+          product_id,
           name,
-          description,
           price,
-          weight,
-          image_url,
-          image_path,
-          available,
+          stock_quantity,
+          sku,
           active,
           sort_order
-        `,
-      )
+        )
+      `)
       .order("sort_order", {
         ascending: true,
       })
@@ -151,12 +220,21 @@ export default function ProductsTab({
       setErrorMessage(
         `Produkterna kunde inte hämtas: ${error.message}`,
       );
-
       setLoading(false);
       return;
     }
 
-    const loadedProducts = (data ?? []) as Product[];
+    const loadedProducts = ((data ?? []) as Product[]).map(
+      (product) => ({
+        ...product,
+        product_variants: [
+          ...(product.product_variants ?? []),
+        ].sort(
+          (a, b) =>
+            (a.sort_order ?? 0) - (b.sort_order ?? 0),
+        ),
+      }),
+    );
 
     setProducts(loadedProducts);
     onProductCountChange?.(loadedProducts.length);
@@ -169,20 +247,14 @@ export default function ProductsTab({
 
   useEffect(() => {
     return () => {
-      if (
-        imagePreview &&
-        imagePreview.startsWith("blob:")
-      ) {
+      if (imagePreview?.startsWith("blob:")) {
         URL.revokeObjectURL(imagePreview);
       }
     };
   }, [imagePreview]);
 
-  function clearFileInput() {
-    if (
-      imagePreview &&
-      imagePreview.startsWith("blob:")
-    ) {
+  function clearSelectedImage() {
+    if (imagePreview?.startsWith("blob:")) {
       URL.revokeObjectURL(imagePreview);
     }
 
@@ -195,35 +267,48 @@ export default function ProductsTab({
   }
 
   function resetForm() {
-    clearFileInput();
+    clearSelectedImage();
 
     setEditingProduct(null);
     setName("");
     setDescription("");
-    setPrice("");
-    setWeight("");
     setSortOrder("0");
     setAvailable(true);
     setActive(true);
+    setVariants([createEmptyVariant()]);
     setExistingImageUrl(null);
     setExistingImagePath(null);
     setRemoveExistingImage(false);
   }
 
   function startEditing(product: Product) {
-    clearFileInput();
+    clearSelectedImage();
 
     setEditingProduct(product);
     setName(product.name);
     setDescription(product.description ?? "");
-    setPrice(String(product.price));
-    setWeight(product.weight ?? "");
     setSortOrder(String(product.sort_order ?? 0));
     setAvailable(product.available);
     setActive(product.active);
+
     setExistingImageUrl(product.image_url);
     setExistingImagePath(product.image_path);
     setRemoveExistingImage(false);
+
+    if (product.product_variants.length > 0) {
+      setVariants(
+        product.product_variants.map(variantToDraft),
+      );
+    } else {
+      setVariants([
+        {
+          ...createEmptyVariant(),
+          name: product.weight || "Standard",
+          price: String(product.price ?? 0),
+        },
+      ]);
+    }
+
     setMessage("");
     setErrorMessage("");
 
@@ -236,6 +321,46 @@ export default function ProductsTab({
   function cancelEditing() {
     resetForm();
     setMessage("Redigeringen avbröts.");
+    setErrorMessage("");
+  }
+
+  function addVariant() {
+    setVariants((current) => [
+      ...current,
+      createEmptyVariant(current.length),
+    ]);
+  }
+
+  function updateVariant(
+    localId: string,
+    changes: Partial<VariantDraft>,
+  ) {
+    setVariants((current) =>
+      current.map((variant) =>
+        variant.localId === localId
+          ? {
+              ...variant,
+              ...changes,
+            }
+          : variant,
+      ),
+    );
+  }
+
+  function removeVariant(localId: string) {
+    if (variants.length <= 1) {
+      setErrorMessage(
+        "Produkten måste ha minst en variant.",
+      );
+      return;
+    }
+
+    setVariants((current) =>
+      current.filter(
+        (variant) => variant.localId !== localId,
+      ),
+    );
+
     setErrorMessage("");
   }
 
@@ -259,10 +384,7 @@ export default function ProductsTab({
       return;
     }
 
-    if (
-      imagePreview &&
-      imagePreview.startsWith("blob:")
-    ) {
+    if (imagePreview?.startsWith("blob:")) {
       URL.revokeObjectURL(imagePreview);
     }
 
@@ -271,16 +393,15 @@ export default function ProductsTab({
     setRemoveExistingImage(false);
   }
 
-  function removeSelectedOrExistingImage() {
+  function removeImage() {
     if (selectedImage) {
-      clearFileInput();
+      clearSelectedImage();
       return;
     }
 
     if (existingImageUrl || existingImagePath) {
-      setRemoveExistingImage(true);
       setExistingImageUrl(null);
-      setImagePreview(null);
+      setRemoveExistingImage(true);
     }
   }
 
@@ -292,8 +413,9 @@ export default function ProductsTab({
       };
     }
 
-    const fileName = createSafeFileName(selectedImage);
-    const imagePath = `products/${fileName}`;
+    const imagePath = `products/${createSafeFileName(
+      selectedImage,
+    )}`;
 
     const { error: uploadError } = await supabase.storage
       .from(IMAGE_BUCKET)
@@ -309,11 +431,11 @@ export default function ProductsTab({
       );
     }
 
-    const { data: publicUrlData } = supabase.storage
+    const { data } = supabase.storage
       .from(IMAGE_BUCKET)
       .getPublicUrl(imagePath);
 
-    if (!publicUrlData.publicUrl) {
+    if (!data.publicUrl) {
       await supabase.storage
         .from(IMAGE_BUCKET)
         .remove([imagePath]);
@@ -324,14 +446,12 @@ export default function ProductsTab({
     }
 
     return {
-      imageUrl: publicUrlData.publicUrl,
+      imageUrl: data.publicUrl,
       imagePath,
     };
   }
 
-  async function removeStorageImage(
-    imagePath: string | null,
-  ) {
+  async function removeStorageImage(imagePath: string | null) {
     if (!imagePath) {
       return;
     }
@@ -342,9 +462,113 @@ export default function ProductsTab({
 
     if (error) {
       console.error(
-        "Bilden kunde inte tas bort från Storage:",
+        "Bilden kunde inte tas bort från lagringen:",
         error,
       );
+    }
+  }
+
+  function validateVariants() {
+    if (variants.length === 0) {
+      return "Lägg till minst en variant.";
+    }
+
+    for (const variant of variants) {
+      const variantName = variant.name.trim();
+      const numericPrice = Number(variant.price);
+      const numericStock = Number(variant.stockQuantity);
+
+      if (!variantName) {
+        return "Alla varianter måste ha ett namn, exempelvis 50 g.";
+      }
+
+      if (
+        variant.price.trim() === "" ||
+        !Number.isFinite(numericPrice) ||
+        numericPrice < 0
+      ) {
+        return `Ange ett giltigt pris för ${variantName}.`;
+      }
+
+      if (
+        variant.stockQuantity.trim() === "" ||
+        !Number.isInteger(numericStock) ||
+        numericStock < 0
+      ) {
+        return `Ange ett giltigt lagersaldo för ${variantName}.`;
+      }
+    }
+
+    return null;
+  }
+
+  async function saveVariants(
+    productId: ProductId,
+    previousVariants: ProductVariant[],
+  ) {
+    const previousIds = previousVariants.map(
+      (variant) => variant.id,
+    );
+
+    const currentSavedIds = variants
+      .map((variant) => variant.id)
+      .filter((id): id is number => id !== null);
+
+    const idsToDelete = previousIds.filter(
+      (id) => !currentSavedIds.includes(id),
+    );
+
+    if (idsToDelete.length > 0) {
+      const { error } = await supabase
+        .from("product_variants")
+        .delete()
+        .in("id", idsToDelete);
+
+      if (error) {
+        throw new Error(
+          `Varianter kunde inte tas bort: ${error.message}`,
+        );
+      }
+    }
+
+    for (const [index, variant] of variants.entries()) {
+      const parsedSortOrder = Number(variant.sortOrder);
+
+      const variantData = {
+        product_id: productId,
+        name: variant.name.trim(),
+        price: Number(variant.price),
+        stock_quantity: Number(variant.stockQuantity),
+        sku: variant.sku.trim() || null,
+        active: variant.active,
+        sort_order: Number.isFinite(parsedSortOrder)
+          ? parsedSortOrder
+          : index,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (variant.id !== null) {
+        const { error } = await supabase
+          .from("product_variants")
+          .update(variantData)
+          .eq("id", variant.id);
+
+        if (error) {
+          throw new Error(
+            `Varianten ${variant.name} kunde inte uppdateras: ${error.message}`,
+          );
+        }
+      } else {
+        const { error } = await supabase
+          .from("product_variants")
+          .insert(variantData);
+
+        if (error) {
+          throw new Error(
+            `Varianten ${variant.name} kunde inte sparas: ${error.message}`,
+          );
+        }
+      }
     }
   }
 
@@ -357,20 +581,15 @@ export default function ProductsTab({
     setErrorMessage("");
 
     const cleanedName = name.trim();
-    const numericPrice = Number(price);
-    const numericSortOrder = Number(sortOrder || 0);
+    const variantError = validateVariants();
 
     if (!cleanedName) {
       setErrorMessage("Du måste ange ett produktnamn.");
       return;
     }
 
-    if (
-      price.trim() === "" ||
-      Number.isNaN(numericPrice) ||
-      numericPrice < 0
-    ) {
-      setErrorMessage("Du måste ange ett giltigt pris.");
+    if (variantError) {
+      setErrorMessage(variantError);
       return;
     }
 
@@ -383,30 +602,35 @@ export default function ProductsTab({
       let finalImagePath = existingImagePath;
 
       if (selectedImage) {
-        const uploadedImage =
-          await uploadSelectedImage();
+        const uploadedImage = await uploadSelectedImage();
 
         finalImageUrl = uploadedImage.imageUrl;
         finalImagePath = uploadedImage.imagePath;
-        newlyUploadedImagePath =
-          uploadedImage.imagePath;
+        newlyUploadedImagePath = uploadedImage.imagePath;
       } else if (removeExistingImage) {
         finalImageUrl = null;
         finalImagePath = null;
       }
 
+      const firstVariant = variants[0];
+      const parsedSortOrder = Number(sortOrder);
+
       const productData = {
         name: cleanedName,
         description: description.trim() || null,
-        price: numericPrice,
-        weight: weight.trim() || null,
+
+        // De gamla fälten behålls tills kundsidan
+        // också använder product_variants.
+        price: Number(firstVariant.price),
+        weight: firstVariant.name.trim(),
+
         image_url: finalImageUrl,
         image_path: finalImagePath,
-        active,
         available,
-        sort_order: Number.isNaN(numericSortOrder)
-          ? 0
-          : numericSortOrder,
+        active,
+        sort_order: Number.isFinite(parsedSortOrder)
+          ? parsedSortOrder
+          : 0,
         updated_at: new Date().toISOString(),
       };
 
@@ -420,9 +644,7 @@ export default function ProductsTab({
 
         if (error) {
           if (newlyUploadedImagePath) {
-            await removeStorageImage(
-              newlyUploadedImagePath,
-            );
+            await removeStorageImage(newlyUploadedImagePath);
           }
 
           throw new Error(
@@ -430,39 +652,61 @@ export default function ProductsTab({
           );
         }
 
-        const imageWasReplaced =
-          selectedImage &&
+        await saveVariants(
+          editingProduct.id,
+          editingProduct.product_variants,
+        );
+
+        if (
           oldImagePath &&
-          oldImagePath !== finalImagePath;
-
-        const imageWasRemoved =
-          removeExistingImage && oldImagePath;
-
-        if (imageWasReplaced || imageWasRemoved) {
+          oldImagePath !== finalImagePath &&
+          (selectedImage || removeExistingImage)
+        ) {
           await removeStorageImage(oldImagePath);
         }
 
         resetForm();
-        setMessage("Produkten har uppdaterats.");
+        setMessage(
+          "Produkten och varianterna har uppdaterats.",
+        );
       } else {
-        const { error } = await supabase
+        const { data: createdProduct, error } = await supabase
           .from("products")
-          .insert(productData);
+          .insert(productData)
+          .select("id")
+          .single();
 
-        if (error) {
+        if (error || !createdProduct) {
           if (newlyUploadedImagePath) {
-            await removeStorageImage(
-              newlyUploadedImagePath,
-            );
+            await removeStorageImage(newlyUploadedImagePath);
           }
 
           throw new Error(
-            `Produkten kunde inte sparas: ${error.message}`,
+            `Produkten kunde inte sparas: ${
+              error?.message || "Produkt-ID saknas."
+            }`,
           );
         }
 
+        try {
+          await saveVariants(createdProduct.id, []);
+        } catch (variantError) {
+          await supabase
+            .from("products")
+            .delete()
+            .eq("id", createdProduct.id);
+
+          if (newlyUploadedImagePath) {
+            await removeStorageImage(newlyUploadedImagePath);
+          }
+
+          throw variantError;
+        }
+
         resetForm();
-        setMessage("Produkten har lagts till.");
+        setMessage(
+          "Produkten och varianterna har lagts till.",
+        );
       }
 
       await loadProducts();
@@ -473,18 +717,15 @@ export default function ProductsTab({
           : "Ett okänt fel inträffade.";
 
       setErrorMessage(readableMessage);
-      window.alert(readableMessage);
     } finally {
       setSaving(false);
     }
   }
 
-  async function handleToggleAvailable(
-    product: Product,
-  ) {
+  async function toggleProductAvailable(product: Product) {
+    setBusyProductId(product.id);
     setMessage("");
     setErrorMessage("");
-    setBusyProductId(product.id);
 
     const { error } = await supabase
       .from("products")
@@ -499,19 +740,17 @@ export default function ProductsTab({
         `Tillgängligheten kunde inte ändras: ${error.message}`,
       );
     } else {
-      setMessage("Produktens lagerstatus ändrades.");
+      setMessage("Produktens lagerstatus har ändrats.");
       await loadProducts();
     }
 
     setBusyProductId(null);
   }
 
-  async function handleToggleActive(
-    product: Product,
-  ) {
+  async function toggleProductActive(product: Product) {
+    setBusyProductId(product.id);
     setMessage("");
     setErrorMessage("");
-    setBusyProductId(product.id);
 
     const { error } = await supabase
       .from("products")
@@ -523,42 +762,38 @@ export default function ProductsTab({
 
     if (error) {
       setErrorMessage(
-        `Synligheten kunde inte ändras: ${error.message}`,
+        `Produktens synlighet kunde inte ändras: ${error.message}`,
       );
     } else {
-      setMessage("Produktens synlighet ändrades.");
+      setMessage("Produktens synlighet har ändrats.");
       await loadProducts();
     }
 
     setBusyProductId(null);
   }
 
-  async function handleDeleteProduct(
-    product: Product,
-  ) {
+  async function deleteProduct(product: Product) {
     const confirmed = window.confirm(
-      `Vill du radera produkten "${product.name}"?`,
+      `Vill du radera "${product.name}" och alla varianter?`,
     );
 
     if (!confirmed) {
       return;
     }
 
+    setBusyProductId(product.id);
     setMessage("");
     setErrorMessage("");
-    setBusyProductId(product.id);
 
-    const { error: deleteProductError } =
-      await supabase
-        .from("products")
-        .delete()
-        .eq("id", product.id);
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", product.id);
 
-    if (deleteProductError) {
+    if (error) {
       setErrorMessage(
-        `Produkten kunde inte raderas: ${deleteProductError.message}`,
+        `Produkten kunde inte raderas: ${error.message}`,
       );
-
       setBusyProductId(null);
       return;
     }
@@ -574,21 +809,60 @@ export default function ProductsTab({
     setBusyProductId(null);
   }
 
-  const displayedPreview =
+  const displayedImage =
     imagePreview ||
-    (!removeExistingImage
-      ? existingImageUrl
-      : null);
+    (!removeExistingImage ? existingImageUrl : null);
 
   return (
     <section className="products-manager">
+      <div
+        style={{
+          marginBottom: 24,
+          padding: 20,
+          borderRadius: 16,
+          background:
+            "linear-gradient(135deg, #1f2937, #111827)",
+          color: "white",
+        }}
+      >
+        <p
+          style={{
+            margin: 0,
+            fontSize: 13,
+            fontWeight: 800,
+            letterSpacing: 1.4,
+            textTransform: "uppercase",
+            opacity: 0.75,
+          }}
+        >
+          Ny produktadministration
+        </p>
+
+        <h2
+          style={{
+            margin: "7px 0 5px",
+            fontSize: 28,
+          }}
+        >
+          Produktvarianter V2
+        </h2>
+
+        <p
+          style={{
+            margin: 0,
+            opacity: 0.82,
+          }}
+        >
+          Lägg till flera storlekar, priser, lagersaldon och
+          artikelnummer på samma produkt.
+        </p>
+      </div>
+
       <section className="products-form-card">
         <div className="products-card-heading">
           <div>
             <p className="products-eyebrow">
-              {isEditing
-                ? "Redigera produkt"
-                : "Ny produkt"}
+              {isEditing ? "Redigera produkt" : "Ny produkt"}
             </p>
 
             <h2>
@@ -600,15 +874,11 @@ export default function ProductsTab({
         </div>
 
         {message && (
-          <div className="products-message">
-            {message}
-          </div>
+          <div className="products-message">{message}</div>
         )}
 
         {errorMessage && (
-          <div className="products-error">
-            {errorMessage}
-          </div>
+          <div className="products-error">{errorMessage}</div>
         )}
 
         <form
@@ -622,7 +892,7 @@ export default function ProductsTab({
               <input
                 type="text"
                 value={name}
-                placeholder="Exempel: Grillkol 10 kg"
+                placeholder="Exempel: Texas BBQ Rub"
                 required
                 disabled={saving}
                 onChange={(event) =>
@@ -636,7 +906,7 @@ export default function ProductsTab({
 
               <textarea
                 value={description}
-                placeholder="Skriv en utförlig beskrivning av produkten"
+                placeholder="Beskriv produkten"
                 disabled={saving}
                 onChange={(event) =>
                   setDescription(event.target.value)
@@ -644,39 +914,8 @@ export default function ProductsTab({
               />
             </label>
 
-            <label className="products-field">
-              <span>Pris i kronor *</span>
-
-              <input
-                type="number"
-                value={price}
-                placeholder="200"
-                min="0"
-                step="1"
-                required
-                disabled={saving}
-                onChange={(event) =>
-                  setPrice(event.target.value)
-                }
-              />
-            </label>
-
-            <label className="products-field">
-              <span>Vikt</span>
-
-              <input
-                type="text"
-                value={weight}
-                placeholder="Exempel: 10 kg"
-                disabled={saving}
-                onChange={(event) =>
-                  setWeight(event.target.value)
-                }
-              />
-            </label>
-
             <label className="products-field products-field-full">
-              <span>Sorteringsordning</span>
+              <span>Produktens sorteringsordning</span>
 
               <input
                 type="number"
@@ -691,7 +930,239 @@ export default function ProductsTab({
             </label>
           </div>
 
-          <div className="product-image-uploader">
+          <section
+            style={{
+              marginTop: 26,
+              padding: 20,
+              border: "2px solid #e5e7eb",
+              borderRadius: 16,
+              background: "#f9fafb",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                justifyContent: "space-between",
+                gap: 16,
+                flexWrap: "wrap",
+                marginBottom: 18,
+              }}
+            >
+              <div>
+                <p
+                  className="products-eyebrow"
+                  style={{ marginBottom: 5 }}
+                >
+                  Produktvarianter
+                </p>
+
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 21,
+                  }}
+                >
+                  Storlekar, priser och lager
+                </h3>
+
+                <p
+                  style={{
+                    margin: "6px 0 0",
+                    color: "#6b7280",
+                  }}
+                >
+                  Exempel: 50 g – 45 kr och 100 g – 69 kr.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                className="products-primary-button"
+                disabled={saving}
+                onClick={addVariant}
+              >
+                + Lägg till variant
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: "grid",
+                gap: 16,
+              }}
+            >
+              {variants.map((variant, index) => (
+                <article
+                  key={variant.localId}
+                  style={{
+                    padding: 18,
+                    border: "1px solid #d1d5db",
+                    borderRadius: 14,
+                    background: "white",
+                    boxShadow:
+                      "0 3px 12px rgba(0,0,0,0.05)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      marginBottom: 15,
+                    }}
+                  >
+                    <strong
+                      style={{
+                        fontSize: 17,
+                      }}
+                    >
+                      Variant {index + 1}
+                    </strong>
+
+                    <button
+                      type="button"
+                      className="products-danger-button"
+                      disabled={
+                        saving || variants.length === 1
+                      }
+                      onClick={() =>
+                        removeVariant(variant.localId)
+                      }
+                    >
+                      Ta bort
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "repeat(auto-fit, minmax(180px, 1fr))",
+                      gap: 14,
+                    }}
+                  >
+                    <label className="products-field">
+                      <span>Storlek eller namn *</span>
+
+                      <input
+                        type="text"
+                        value={variant.name}
+                        placeholder="Exempel: 50 g"
+                        required
+                        disabled={saving}
+                        onChange={(event) =>
+                          updateVariant(variant.localId, {
+                            name: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label className="products-field">
+                      <span>Pris i kronor *</span>
+
+                      <input
+                        type="number"
+                        value={variant.price}
+                        placeholder="45"
+                        min="0"
+                        step="0.01"
+                        required
+                        disabled={saving}
+                        onChange={(event) =>
+                          updateVariant(variant.localId, {
+                            price: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label className="products-field">
+                      <span>Lagersaldo *</span>
+
+                      <input
+                        type="number"
+                        value={variant.stockQuantity}
+                        min="0"
+                        step="1"
+                        required
+                        disabled={saving}
+                        onChange={(event) =>
+                          updateVariant(variant.localId, {
+                            stockQuantity: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label className="products-field">
+                      <span>Artikelnummer</span>
+
+                      <input
+                        type="text"
+                        value={variant.sku}
+                        placeholder="Exempel: RUB-50"
+                        disabled={saving}
+                        onChange={(event) =>
+                          updateVariant(variant.localId, {
+                            sku: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label className="products-field">
+                      <span>Sorteringsordning</span>
+
+                      <input
+                        type="number"
+                        value={variant.sortOrder}
+                        min="0"
+                        step="1"
+                        disabled={saving}
+                        onChange={(event) =>
+                          updateVariant(variant.localId, {
+                            sortOrder: event.target.value,
+                          })
+                        }
+                      />
+                    </label>
+
+                    <label
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        alignSelf: "end",
+                        minHeight: 47,
+                        fontWeight: 700,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={variant.active}
+                        disabled={saving}
+                        onChange={(event) =>
+                          updateVariant(variant.localId, {
+                            active: event.target.checked,
+                          })
+                        }
+                      />
+
+                      Varianten är aktiv
+                    </label>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <div
+            className="product-image-uploader"
+            style={{ marginTop: 25 }}
+          >
             <span className="product-image-label">
               Produktbild
             </span>
@@ -706,10 +1177,10 @@ export default function ProductsTab({
                 onChange={handleImageChange}
               />
 
-              {displayedPreview ? (
+              {displayedImage ? (
                 <div className="product-image-preview">
                   <img
-                    src={displayedPreview}
+                    src={displayedImage}
                     alt="Förhandsvisning av produktbild"
                   />
 
@@ -725,9 +1196,7 @@ export default function ProductsTab({
                       type="button"
                       className="product-image-remove"
                       disabled={saving}
-                      onClick={
-                        removeSelectedOrExistingImage
-                      }
+                      onClick={removeImage}
                     >
                       Ta bort bild
                     </button>
@@ -738,9 +1207,7 @@ export default function ProductsTab({
                   className="product-image-select"
                   htmlFor="product-image-input"
                 >
-                  <span className="product-image-icon">
-                    📷
-                  </span>
+                  <span className="product-image-icon">📷</span>
 
                   <strong>Välj produktbild</strong>
 
@@ -767,7 +1234,7 @@ export default function ProductsTab({
                 <strong>Tillgänglig</strong>
 
                 <small>
-                  Produkten går att beställa direkt.
+                  Produkten går att beställa.
                 </small>
               </span>
             </label>
@@ -799,33 +1266,22 @@ export default function ProductsTab({
               disabled={saving}
             >
               {saving
-                ? isEditing
-                  ? "Sparar ändringarna..."
-                  : "Lägger till produkten..."
+                ? "Sparar..."
                 : isEditing
-                  ? "Spara ändringar"
+                  ? "Spara produkt"
                   : "Lägg till produkt"}
             </button>
 
-            {isEditing ? (
-              <button
-                type="button"
-                className="products-secondary-button"
-                disabled={saving}
-                onClick={cancelEditing}
-              >
-                Avbryt
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="products-secondary-button"
-                disabled={saving}
-                onClick={resetForm}
-              >
-                Rensa
-              </button>
-            )}
+            <button
+              type="button"
+              className="products-secondary-button"
+              disabled={saving}
+              onClick={
+                isEditing ? cancelEditing : resetForm
+              }
+            >
+              {isEditing ? "Avbryt" : "Rensa"}
+            </button>
           </div>
         </form>
       </section>
@@ -859,10 +1315,7 @@ export default function ProductsTab({
           <div className="products-empty">
             <span>🔥</span>
             <h3>Inga produkter ännu</h3>
-
-            <p>
-              Lägg till din första produkt i formuläret.
-            </p>
+            <p>Lägg till din första produkt.</p>
           </div>
         ) : (
           <div className="products-list">
@@ -911,21 +1364,8 @@ export default function ProductsTab({
                               Dold
                             </span>
                           )}
-
-                          {product.weight && (
-                            <span className="products-badge products-badge-hidden">
-                              {product.weight}
-                            </span>
-                          )}
                         </div>
                       </div>
-
-                      <strong className="products-product-price">
-                        {Number(
-                          product.price,
-                        ).toLocaleString("sv-SE")}{" "}
-                        kr
-                      </strong>
                     </div>
 
                     {product.description && (
@@ -934,14 +1374,95 @@ export default function ProductsTab({
                       </p>
                     )}
 
+                    <div
+                      style={{
+                        display: "grid",
+                        gap: 9,
+                        marginTop: 14,
+                        marginBottom: 18,
+                      }}
+                    >
+                      {product.product_variants.length === 0 ? (
+                        <div
+                          style={{
+                            padding: 12,
+                            borderRadius: 10,
+                            background: "#fef3c7",
+                          }}
+                        >
+                          Produkten saknar sparade varianter.
+                        </div>
+                      ) : (
+                        product.product_variants.map(
+                          (variant) => (
+                            <div
+                              key={variant.id}
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns:
+                                  "minmax(100px, 1fr) auto auto",
+                                gap: 12,
+                                alignItems: "center",
+                                padding: "11px 13px",
+                                border: "1px solid #e5e7eb",
+                                borderRadius: 10,
+                                background: "#f9fafb",
+                              }}
+                            >
+                              <div>
+                                <strong>
+                                  {variant.name}
+                                </strong>
+
+                                {variant.sku && (
+                                  <small
+                                    style={{
+                                      display: "block",
+                                      marginTop: 3,
+                                      color: "#6b7280",
+                                    }}
+                                  >
+                                    Art.nr: {variant.sku}
+                                  </small>
+                                )}
+                              </div>
+
+                              <strong>
+                                {formatPrice(variant.price)} kr
+                              </strong>
+
+                              <span
+                                style={{
+                                  fontSize: 13,
+                                  color: "#4b5563",
+                                }}
+                              >
+                                Lager:{" "}
+                                {variant.stock_quantity}
+                              </span>
+
+                              {!variant.active && (
+                                <small
+                                  style={{
+                                    color: "#b91c1c",
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  Varianten är dold
+                                </small>
+                              )}
+                            </div>
+                          ),
+                        )
+                      )}
+                    </div>
+
                     <div className="products-product-actions">
                       <button
                         type="button"
                         className="products-primary-button"
                         disabled={isBusy}
-                        onClick={() =>
-                          startEditing(product)
-                        }
+                        onClick={() => startEditing(product)}
                       >
                         Redigera
                       </button>
@@ -951,9 +1472,7 @@ export default function ProductsTab({
                         className="products-action-button"
                         disabled={isBusy}
                         onClick={() =>
-                          void handleToggleAvailable(
-                            product,
-                          )
+                          void toggleProductAvailable(product)
                         }
                       >
                         {product.available
@@ -966,7 +1485,7 @@ export default function ProductsTab({
                         className="products-action-button"
                         disabled={isBusy}
                         onClick={() =>
-                          void handleToggleActive(product)
+                          void toggleProductActive(product)
                         }
                       >
                         {product.active
@@ -979,12 +1498,10 @@ export default function ProductsTab({
                         className="products-danger-button"
                         disabled={isBusy}
                         onClick={() =>
-                          void handleDeleteProduct(product)
+                          void deleteProduct(product)
                         }
                       >
-                        {isBusy
-                          ? "Arbetar..."
-                          : "Radera"}
+                        {isBusy ? "Arbetar..." : "Radera"}
                       </button>
                     </div>
                   </div>

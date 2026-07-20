@@ -1,0 +1,135 @@
+.variant-editor {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid #ddd2c8;
+  border-radius: 14px;
+  background: #faf7f4;
+}
+
+.variant-editor-heading,
+.variant-card-heading,
+.product-variant-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.variant-editor-heading h3 {
+  margin: 4px 0;
+  font-size: 21px;
+}
+
+.variant-editor-heading small {
+  color: #70665e;
+}
+
+.variant-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.variant-card {
+  padding: 17px;
+  border: 1px solid #d8cec5;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.variant-card-heading {
+  margin-bottom: 14px;
+}
+
+.variant-remove-button {
+  min-height: 35px;
+  padding: 0 12px;
+  border: 1px solid #bd4a3c;
+  border-radius: 8px;
+  background: #fff5f3;
+  color: #9e3025;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.variant-remove-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.variant-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.variant-active-checkbox {
+  min-height: 46px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid #d8cec5;
+  border-radius: 9px;
+  background: #f8f4f0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.product-variant-summary {
+  margin-top: 16px;
+  display: grid;
+  gap: 8px;
+}
+
+.product-variant-row {
+  padding: 11px 13px;
+  border: 1px solid #ded5cd;
+  border-radius: 9px;
+  background: #f7f3ef;
+}
+
+.product-variant-row > div {
+  display: grid;
+  gap: 2px;
+}
+
+.product-variant-row > span {
+  margin-left: auto;
+  color: #d84c0b;
+  font-weight: 900;
+}
+
+.product-variant-row small {
+  color: #6f665e;
+}
+
+.product-variant-row em {
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #e9e4df;
+  color: #70675f;
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+@media (max-width: 700px) {
+  .variant-editor-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .variant-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-variant-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .product-variant-row > span {
+    margin-left: 0;
+  }
+}

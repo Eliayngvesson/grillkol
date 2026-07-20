@@ -10,15 +10,30 @@ import {
 import { supabase } from "@/lib/supabase";
 import styles from "./storefront.module.css";
 
+type ProductId = string | number;
+
+type ProductVariant = {
+  id: number;
+  product_id: ProductId;
+  name: string;
+  price: number | string;
+  stock_quantity: number | null;
+  sku: string | null;
+  active: boolean | null;
+  sort_order: number | null;
+};
+
 type Product = {
-  id: string | number;
+  id: ProductId;
   name: string;
   description: string | null;
   price: number | string;
   image_url: string | null;
   weight: string | null;
   active: boolean | null;
+  available: boolean | null;
   sort_order: number | null;
+  product_variants: ProductVariant[];
 };
 
 type CustomerForm = {
@@ -31,6 +46,18 @@ type CustomerForm = {
   city: string;
   message: string;
   acceptsDeliveryTerms: boolean;
+};
+
+type SelectedVariant = {
+  productId: ProductId;
+  productName: string;
+  productDescription: string | null;
+  variantId: number;
+  variantName: string;
+  sku: string | null;
+  price: number;
+  stockQuantity: number;
+  quantity: number;
 };
 
 const EMPTY_FORM: CustomerForm = {
@@ -49,7 +76,8 @@ function formatPrice(value: number) {
   return new Intl.NumberFormat("sv-SE", {
     style: "currency",
     currency: "SEK",
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -87,17 +115,28 @@ function normalizePostalCode(value: string) {
   return digits;
 }
 
-function getProductPrice(product: Product) {
-  const price = Number(product.price ?? 0);
+function getVariantPrice(variant: ProductVariant) {
+  const price = Number(variant.price ?? 0);
 
   return Number.isFinite(price) ? price : 0;
 }
 
-export default function HomePage() {
-  const [products, setProducts] = useState<Product[]>(
-    [],
-  );
+function getVariantStock(variant: ProductVariant) {
+  const stock = Number(variant.stock_quantity ?? 0);
 
+  if (!Number.isFinite(stock) || stock < 0) {
+    return 0;
+  }
+
+  return Math.floor(stock);
+}
+
+function getQuantityKey(variantId: number) {
+  return String(variantId);
+}
+
+export default function HomePage() {
+  const [products, setProducts] = useState<Product[]>([]);
   const [quantities, setQuantities] = useState<
     Record<string, number>
   >({});
@@ -129,7 +168,27 @@ export default function HomePage() {
 
       const { data, error } = await supabase
         .from("products")
-        .select("*")
+        .select(`
+          id,
+          name,
+          description,
+          price,
+          image_url,
+          weight,
+          active,
+          available,
+          sort_order,
+          product_variants (
+            id,
+            product_id,
+            name,
+            price,
+            stock_quantity,
+            sku,
+            active,
+            sort_order
+          )
+        `)
         .order("sort_order", {
           ascending: true,
         });
@@ -149,7 +208,9 @@ export default function HomePage() {
         (data ?? []) as Product[]
       )
         .filter(
-          (product) => product.active !== false,
+          (product) =>
+            product.active !== false &&
+            product.available !== false,
         )
         .map((product) => ({
           ...product,
@@ -162,7 +223,34 @@ export default function HomePage() {
           sort_order: Number(
             product.sort_order ?? 0,
           ),
-        }));
+          product_variants: [
+            ...(product.product_variants ?? []),
+          ]
+            .filter(
+              (variant) =>
+                variant.active !== false,
+            )
+            .map((variant) => ({
+              ...variant,
+              price: Number(
+                variant.price ?? 0,
+              ),
+              stock_quantity:
+                getVariantStock(variant),
+              sort_order: Number(
+                variant.sort_order ?? 0,
+              ),
+            }))
+            .sort(
+              (a, b) =>
+                Number(a.sort_order ?? 0) -
+                Number(b.sort_order ?? 0),
+            ),
+        }))
+        .filter(
+          (product) =>
+            product.product_variants.length > 0,
+        );
 
       setProducts(loadedProducts);
 
@@ -172,7 +260,13 @@ export default function HomePage() {
       > = {};
 
       loadedProducts.forEach((product) => {
-        initialQuantities[String(product.id)] = 0;
+        product.product_variants.forEach(
+          (variant) => {
+            initialQuantities[
+              getQuantityKey(variant.id)
+            ] = 0;
+          },
+        );
       });
 
       setQuantities(initialQuantities);
@@ -182,51 +276,77 @@ export default function HomePage() {
     void loadProducts();
   }, []);
 
-  const selectedProducts = useMemo(() => {
-    return products
-      .map((product) => ({
-        ...product,
-        quantity:
-          quantities[String(product.id)] ?? 0,
-        numericPrice: getProductPrice(product),
-      }))
-      .filter((product) => product.quantity > 0);
+  const selectedVariants = useMemo<
+    SelectedVariant[]
+  >(() => {
+    return products.flatMap((product) =>
+      product.product_variants
+        .map((variant) => {
+          const quantity =
+            quantities[
+              getQuantityKey(variant.id)
+            ] ?? 0;
+
+          return {
+            productId: product.id,
+            productName: product.name,
+            productDescription:
+              product.description || null,
+            variantId: variant.id,
+            variantName: variant.name,
+            sku: variant.sku,
+            price: getVariantPrice(variant),
+            stockQuantity:
+              getVariantStock(variant),
+            quantity,
+          };
+        })
+        .filter(
+          (variant) => variant.quantity > 0,
+        ),
+    );
   }, [products, quantities]);
 
   const totalItems = useMemo(() => {
-    return selectedProducts.reduce(
-      (total, product) =>
-        total + product.quantity,
+    return selectedVariants.reduce(
+      (total, item) =>
+        total + item.quantity,
       0,
     );
-  }, [selectedProducts]);
+  }, [selectedVariants]);
 
   const totalPrice = useMemo(() => {
-    return selectedProducts.reduce(
-      (total, product) =>
+    return selectedVariants.reduce(
+      (total, item) =>
         total +
-        product.numericPrice *
-          product.quantity,
+        item.price * item.quantity,
       0,
     );
-  }, [selectedProducts]);
+  }, [selectedVariants]);
 
   function changeQuantity(
-    productId: string | number,
+    variant: ProductVariant,
     difference: number,
   ) {
-    const key = String(productId);
+    const key = getQuantityKey(variant.id);
+    const maxStock =
+      getVariantStock(variant);
 
     setQuantities((current) => {
       const currentQuantity =
         current[key] ?? 0;
 
-      return {
-        ...current,
-        [key]: Math.max(
-          0,
+      const nextQuantity = Math.max(
+        0,
+        Math.min(
+          maxStock,
           currentQuantity + difference,
         ),
+      );
+
+      return {
+        ...current,
+        [key]: nextQuantity,
       };
     });
 
@@ -250,6 +370,17 @@ export default function HomePage() {
   function validateOrder() {
     if (totalItems < 1) {
       return "Välj minst en produkt innan du skickar beställningen.";
+    }
+
+    const itemOverStock =
+      selectedVariants.find(
+        (item) =>
+          item.quantity >
+          item.stockQuantity,
+      );
+
+    if (itemOverStock) {
+      return `${itemOverStock.productName} – ${itemOverStock.variantName} finns inte i valt antal.`;
     }
 
     if (form.firstName.trim().length < 2) {
@@ -320,17 +451,20 @@ export default function HomePage() {
       `${form.firstName.trim()} ${form.lastName.trim()}`;
 
     const orderProducts =
-      selectedProducts.map((product) => ({
-        id: product.id,
-        name: product.name,
+      selectedVariants.map((item) => ({
+        id: item.productId,
+        product_id: item.productId,
+        name: item.productName,
         description:
-          product.description || null,
-        weight: product.weight || null,
-        price: product.numericPrice,
-        quantity: product.quantity,
+          item.productDescription,
+        variant_id: item.variantId,
+        variant_name: item.variantName,
+        sku: item.sku,
+        weight: item.variantName,
+        price: item.price,
+        quantity: item.quantity,
         rowTotal:
-          product.numericPrice *
-          product.quantity,
+          item.price * item.quantity,
       }));
 
     const deliveryMessageParts = [
@@ -392,9 +526,13 @@ export default function HomePage() {
     > = {};
 
     products.forEach((product) => {
-      clearedQuantities[
-        String(product.id)
-      ] = 0;
+      product.product_variants.forEach(
+        (variant) => {
+          clearedQuantities[
+            getQuantityKey(variant.id)
+          ] = 0;
+        },
+      );
     });
 
     setQuantities(clearedQuantities);
@@ -538,8 +676,7 @@ export default function HomePage() {
                 <h2>Välj produkter</h2>
 
                 <p>
-                  Välj dina produkter och
-                  antal.
+                  Välj storlek och antal.
                 </p>
               </div>
             </div>
@@ -566,7 +703,7 @@ export default function HomePage() {
 
                 <p>
                   Lägg till aktiva produkter
-                  i Supabase.
+                  och varianter i admin.
                 </p>
               </div>
             ) : (
@@ -574,16 +711,38 @@ export default function HomePage() {
                 className={styles.productList}
               >
                 {products.map((product) => {
-                  const quantity =
-                    quantities[
-                      String(product.id)
-                    ] ?? 0;
+                  const selectedForProduct =
+                    product.product_variants.reduce(
+                      (total, variant) =>
+                        total +
+                        (quantities[
+                          getQuantityKey(
+                            variant.id,
+                          )
+                        ] ?? 0),
+                      0,
+                    );
 
-                  const price =
-                    getProductPrice(product);
+                  const productSubtotal =
+                    product.product_variants.reduce(
+                      (total, variant) => {
+                        const quantity =
+                          quantities[
+                            getQuantityKey(
+                              variant.id,
+                            )
+                          ] ?? 0;
 
-                  const rowTotal =
-                    price * quantity;
+                        return (
+                          total +
+                          getVariantPrice(
+                            variant,
+                          ) *
+                            quantity
+                        );
+                      },
+                      0,
+                    );
 
                   return (
                     <article
@@ -620,8 +779,7 @@ export default function HomePage() {
                             </strong>
 
                             <small>
-                              {product.weight ||
-                                "40 LITER"}
+                              VÄLJ STORLEK
                             </small>
                           </div>
                         )}
@@ -644,24 +802,167 @@ export default function HomePage() {
                           </p>
                         )}
 
-                        {product.weight && (
-                          <span
-                            className={
-                              styles.weightBadge
-                            }
-                          >
-                            {product.weight}
-                          </span>
-                        )}
-
-                        <strong
-                          className={
-                            styles.productPrice
-                          }
+                        <div
+                          style={{
+                            display: "grid",
+                            gap: 10,
+                            marginTop: 16,
+                          }}
                         >
-                          {formatPrice(price)}{" "}
-                          / st
-                        </strong>
+                          {product.product_variants.map(
+                            (variant) => {
+                              const key =
+                                getQuantityKey(
+                                  variant.id,
+                                );
+
+                              const quantity =
+                                quantities[key] ??
+                                0;
+
+                              const price =
+                                getVariantPrice(
+                                  variant,
+                                );
+
+                              const stock =
+                                getVariantStock(
+                                  variant,
+                                );
+
+                              const soldOut =
+                                stock === 0;
+
+                              return (
+                                <div
+                                  key={variant.id}
+                                  style={{
+                                    display:
+                                      "grid",
+                                    gridTemplateColumns:
+                                      "minmax(110px, 1fr) auto",
+                                    gap: 12,
+                                    alignItems:
+                                      "center",
+                                    padding:
+                                      "12px 14px",
+                                    border:
+                                      quantity > 0
+                                        ? "2px solid #111827"
+                                        : "1px solid #d1d5db",
+                                    borderRadius:
+                                      12,
+                                    background:
+                                      quantity > 0
+                                        ? "#f3f4f6"
+                                        : "#ffffff",
+                                    opacity:
+                                      soldOut
+                                        ? 0.65
+                                        : 1,
+                                  }}
+                                >
+                                  <div>
+                                    <strong
+                                      style={{
+                                        display:
+                                          "block",
+                                        fontSize:
+                                          16,
+                                      }}
+                                    >
+                                      {
+                                        variant.name
+                                      }
+                                    </strong>
+
+                                    <span
+                                      style={{
+                                        display:
+                                          "block",
+                                        marginTop:
+                                          4,
+                                        fontWeight:
+                                          800,
+                                      }}
+                                    >
+                                      {formatPrice(
+                                        price,
+                                      )}{" "}
+                                      / st
+                                    </span>
+
+                                    <small
+                                      style={{
+                                        display:
+                                          "block",
+                                        marginTop:
+                                          3,
+                                        color:
+                                          soldOut
+                                            ? "#b91c1c"
+                                            : "#6b7280",
+                                      }}
+                                    >
+                                      {soldOut
+                                        ? "Slut i lager"
+                                        : `${stock} st i lager`}
+                                    </small>
+                                  </div>
+
+                                  <div
+                                    className={
+                                      styles.quantityControl
+                                    }
+                                  >
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        quantity ===
+                                          0 ||
+                                        submitting
+                                      }
+                                      onClick={() =>
+                                        changeQuantity(
+                                          variant,
+                                          -1,
+                                        )
+                                      }
+                                      aria-label={`Minska antal ${product.name} ${variant.name}`}
+                                    >
+                                      −
+                                    </button>
+
+                                    <span>
+                                      {
+                                        quantity
+                                      }
+                                    </span>
+
+                                    <button
+                                      type="button"
+                                      disabled={
+                                        soldOut ||
+                                        quantity >=
+                                          stock ||
+                                        submitting
+                                      }
+                                      onClick={() =>
+                                        changeQuantity(
+                                          variant,
+                                          1,
+                                        )
+                                      }
+                                      aria-label={`Öka antal ${product.name} ${variant.name}`}
+                                    >
+                                      +
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            },
+                          )}
+                        </div>
                       </div>
 
                       <div
@@ -669,47 +970,23 @@ export default function HomePage() {
                           styles.quantityColumn
                         }
                       >
-                        <div
-                          className={
-                            styles.quantityControl
-                          }
+                        <span
+                          style={{
+                            fontSize: 13,
+                            color: "#6b7280",
+                          }}
                         >
-                          <button
-                            type="button"
-                            disabled={
-                              quantity === 0
-                            }
-                            onClick={() =>
-                              changeQuantity(
-                                product.id,
-                                -1,
-                              )
-                            }
-                            aria-label={`Minska antal ${product.name}`}
-                          >
-                            −
-                          </button>
-
-                          <span>
-                            {quantity}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              changeQuantity(
-                                product.id,
-                                1,
-                              )
-                            }
-                            aria-label={`Öka antal ${product.name}`}
-                          >
-                            +
-                          </button>
-                        </div>
+                          Valda
+                        </span>
 
                         <strong>
-                          {formatPrice(rowTotal)}
+                          {selectedForProduct} st
+                        </strong>
+
+                        <strong>
+                          {formatPrice(
+                            productSubtotal,
+                          )}
                         </strong>
                       </div>
                     </article>
@@ -1057,8 +1334,8 @@ export default function HomePage() {
               <h3>Välj produkter</h3>
 
               <p>
-                Ange hur många säckar du
-                vill beställa.
+                Välj storlek och ange hur
+                många du vill beställa.
               </p>
             </article>
 
