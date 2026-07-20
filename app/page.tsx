@@ -911,9 +911,16 @@ export default function HomePage() {
                                   </div>
 
                                   <div
-                                    className={
-                                      styles.quantityControl
-                                    }
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns:
+                                        "44px 38px 44px",
+                                      alignItems: "center",
+                                      justifyContent: "end",
+                                      gap: 6,
+                                      minWidth: 138,
+                                      flexShrink: 0,
+                                    }}
                                   >
                                     <button
                                       type="button"
@@ -929,14 +936,47 @@ export default function HomePage() {
                                         )
                                       }
                                       aria-label={`Minska antal ${product.name} ${variant.name}`}
+                                      style={{
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 10,
+                                        border:
+                                          "1px solid #cbd5e1",
+                                        background:
+                                          quantity === 0 ||
+                                          submitting
+                                            ? "#f1f5f9"
+                                            : "#ffffff",
+                                        color:
+                                          quantity === 0 ||
+                                          submitting
+                                            ? "#94a3b8"
+                                            : "#111827",
+                                        fontSize: 26,
+                                        fontWeight: 800,
+                                        lineHeight: 1,
+                                        cursor:
+                                          quantity === 0 ||
+                                          submitting
+                                            ? "not-allowed"
+                                            : "pointer",
+                                      }}
                                     >
                                       −
                                     </button>
 
-                                    <span>
-                                      {
-                                        quantity
-                                      }
+                                    <span
+                                      style={{
+                                        display: "grid",
+                                        placeItems: "center",
+                                        minWidth: 38,
+                                        height: 44,
+                                        fontSize: 18,
+                                        fontWeight: 800,
+                                        color: "#111827",
+                                      }}
+                                    >
+                                      {quantity}
                                     </span>
 
                                     <button
@@ -954,6 +994,34 @@ export default function HomePage() {
                                         )
                                       }
                                       aria-label={`Öka antal ${product.name} ${variant.name}`}
+                                      style={{
+                                        width: 44,
+                                        height: 44,
+                                        borderRadius: 10,
+                                        border:
+                                          "1px solid #cbd5e1",
+                                        background:
+                                          soldOut ||
+                                          quantity >= stock ||
+                                          submitting
+                                            ? "#f1f5f9"
+                                            : "#ffffff",
+                                        color:
+                                          soldOut ||
+                                          quantity >= stock ||
+                                          submitting
+                                            ? "#94a3b8"
+                                            : "#111827",
+                                        fontSize: 26,
+                                        fontWeight: 800,
+                                        lineHeight: 1,
+                                        cursor:
+                                          soldOut ||
+                                          quantity >= stock ||
+                                          submitting
+                                            ? "not-allowed"
+                                            : "pointer",
+                                      }}
                                     >
                                       +
                                     </button>
