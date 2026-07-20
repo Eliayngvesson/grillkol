@@ -321,4 +321,144 @@
   .modern-modal-footer>* {
     width: 100%;
   }
+}.order-card-products {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid #ded6ce;
+  border-radius: 14px;
+  background: #fffaf6;
+}
+
+.order-card-products-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  margin-bottom: 14px;
+}
+
+.order-card-products-heading > div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.order-card-products-heading h4 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.order-card-products-heading > strong {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #24201d;
+  color: white;
+  font-size: 13px;
+}
+
+.order-card-product-list {
+  display: grid;
+  gap: 9px;
+}
+
+.order-card-product-row {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 13px;
+  border-radius: 11px;
+  background: white;
+  border: 1px solid #e9e1da;
+}
+
+.order-card-product-description {
+  min-width: 0;
+}
+
+.order-card-product-description strong,
+.order-card-product-description span,
+.order-card-product-description small {
+  display: block;
+}
+
+.order-card-product-description strong {
+  font-size: 16px;
+}
+
+.order-card-product-description span {
+  margin-top: 4px;
+  color: #b64c0c;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.order-card-product-description small {
+  margin-top: 4px;
+  color: #756b62;
+}
+
+.order-card-product-price {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.order-card-product-price span,
+.order-card-product-price strong {
+  display: block;
+}
+
+.order-card-product-price span {
+  color: #706860;
+  font-size: 13px;
+}
+
+.order-card-product-price strong {
+  margin-top: 4px;
+  font-size: 17px;
+}
+
+.order-card-no-products {
+  margin: 0;
+  padding: 13px;
+  border-radius: 10px;
+  background: #fff1df;
+  color: #8c3f0e;
+  font-weight: 700;
+}
+
+.order-card-message {
+  margin-bottom: 18px;
+  padding: 15px;
+  border-left: 4px solid #ef650f;
+  border-radius: 8px;
+  background: #fff7f1;
+}
+
+.order-card-message span {
+  display: block;
+  margin-bottom: 6px;
+  color: #8b3c0c;
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.order-card-message p {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 600px) {
+  .order-card-product-row {
+    grid-template-columns: 1fr;
+  }
+
+  .order-card-product-price {
+    padding-top: 9px;
+    border-top: 1px solid #e9e1da;
+    text-align: left;
+  }
 }
