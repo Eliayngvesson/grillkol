@@ -1,19 +1,20 @@
 "use client";
 
 import {
-  ChangeEvent,
+  type ChangeEvent,
   useRef,
 } from "react";
+
+import type {
+  ProductImageState,
+} from "@/app/admin/types";
 
 import {
   validateProductImage,
 } from "@/app/admin/storage";
 
 type ImageUploaderProps = {
-  currentImageUrl: string;
-  selectedImageFile: File | null;
-  imagePreviewUrl: string;
-  removeCurrentImage: boolean;
+  imageState: ProductImageState;
   disabled?: boolean;
   onSelectImage: (file: File) => void;
   onRemoveImage: () => void;
@@ -22,10 +23,7 @@ type ImageUploaderProps = {
 };
 
 export default function ImageUploader({
-  currentImageUrl,
-  selectedImageFile,
-  imagePreviewUrl,
-  removeCurrentImage,
+  imageState,
   disabled = false,
   onSelectImage,
   onRemoveImage,
@@ -36,6 +34,13 @@ export default function ImageUploader({
     useRef<HTMLInputElement | null>(
       null,
     );
+
+  const {
+    currentImageUrl,
+    selectedImageFile,
+    imagePreviewUrl,
+    removeCurrentImage,
+  } = imageState;
 
   function handleFileChange(
     event: ChangeEvent<HTMLInputElement>,
