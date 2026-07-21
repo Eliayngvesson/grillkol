@@ -1,61 +1,472 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import { useState } from "react";
+import Link from "next/link";
 
-const DeliveryPlanner = dynamic(
-  () => import("@/components/delivery/DeliveryPlanner"),
-  {
-    ssr: false,
-    loading: () => (
-      <main
-        style={{
-          minHeight: "100vh",
-          display: "grid",
-          placeItems: "center",
-          padding: "24px",
-          background:
-            "radial-gradient(circle at top, #3b3129 0%, #191613 42%, #0d0c0b 100%)",
-          color: "#ffffff",
-          fontFamily: "Arial, Helvetica, sans-serif",
-        }}
-      >
-        <div
-          style={{
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              marginBottom: "14px",
-              fontSize: "46px",
-            }}
-          >
-            🗺️
+import type { AdminTab } from "./types";
+
+import ProductsTab from "@/components/admin/ProductsTab";
+import OrdersTab from "@/components/orders/OrdersTab";
+
+import styles from "./page.module.css";
+
+type ActiveAdminView =
+  | "overview"
+  | AdminTab;
+
+export default function AdminPage() {
+  const [activeView, setActiveView] =
+    useState<ActiveAdminView>("overview");
+
+  const [orderCount, setOrderCount] =
+    useState(0);
+
+  const [productCount, setProductCount] =
+    useState(0);
+
+  function openOrders() {
+    setActiveView("orders");
+  }
+
+  function openProducts() {
+    setActiveView("products");
+  }
+
+  return (
+    <main className={styles.page}>
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <div className={styles.brand}>
+            <div className={styles.brandIcon}>
+              🔥
+            </div>
+
+            <div>
+              <p className={styles.eyebrow}>
+                Administration
+              </p>
+
+              <h1>Grillkolsbutiken</h1>
+            </div>
           </div>
 
-          <h1
-            style={{
-              margin: "0 0 8px",
-              fontSize: "28px",
-            }}
-          >
-            Leveransplanering
-          </h1>
-
-          <p
-            style={{
-              margin: 0,
-              color: "#cfc5bc",
-            }}
-          >
-            Kartan och beställningarna laddas...
-          </p>
+          <div className={styles.headerActions}>
+            <Link
+              href="/"
+              className={styles.customerLink}
+            >
+              <span>↗</span>
+              Visa kundsidan
+            </Link>
+          </div>
         </div>
-      </main>
-    ),
-  },
-);
+      </header>
 
-export default function DeliveryPage() {
-  return <DeliveryPlanner />;
+      <section className={styles.shell}>
+        <nav
+          className={styles.mainNavigation}
+          aria-label="Administration"
+        >
+          <button
+            type="button"
+            className={`${styles.navigationButton} ${
+              activeView === "overview"
+                ? styles.navigationActive
+                : ""
+            }`}
+            onClick={() =>
+              setActiveView("overview")
+            }
+          >
+            <span
+              className={styles.navigationIcon}
+            >
+              🏠
+            </span>
+
+            <span>Översikt</span>
+          </button>
+
+          <button
+            type="button"
+            className={`${styles.navigationButton} ${
+              activeView === "orders"
+                ? styles.navigationActive
+                : ""
+            }`}
+            onClick={openOrders}
+          >
+            <span
+              className={styles.navigationIcon}
+            >
+              🛒
+            </span>
+
+            <span>Beställningar</span>
+
+            <strong
+              className={styles.navigationCount}
+            >
+              {orderCount}
+            </strong>
+          </button>
+
+          <button
+            type="button"
+            className={`${styles.navigationButton} ${
+              activeView === "products"
+                ? styles.navigationActive
+                : ""
+            }`}
+            onClick={openProducts}
+          >
+            <span
+              className={styles.navigationIcon}
+            >
+              📦
+            </span>
+
+            <span>Produkter</span>
+
+            <strong
+              className={styles.navigationCount}
+            >
+              {productCount}
+            </strong>
+          </button>
+
+          <Link
+            href="/admin/leveranser"
+            className={styles.navigationLink}
+          >
+            <span
+              className={styles.navigationIcon}
+            >
+              🚚
+            </span>
+
+            <span>Leveranser</span>
+          </Link>
+
+          <Link
+            href="/admin/forare"
+            className={styles.navigationLink}
+          >
+            <span
+              className={styles.navigationIcon}
+            >
+              🚛
+            </span>
+
+            <span>Förarmeny</span>
+          </Link>
+        </nav>
+
+        <div className={styles.content}>
+          {activeView === "overview" && (
+            <section className={styles.overview}>
+              <article
+                className={styles.welcomeCard}
+              >
+                <div
+                  className={styles.welcomeText}
+                >
+                  <p className={styles.eyebrow}>
+                    Kontrollpanel
+                  </p>
+
+                  <h2>
+                    Välkommen till
+                    administrationen
+                  </h2>
+
+                  <p>
+                    Här hanterar du
+                    beställningar, produkter
+                    och leveranser från en och
+                    samma plats.
+                  </p>
+                </div>
+
+                <Link
+                  href="/admin/leveranser"
+                  className={
+                    styles.deliveryButton
+                  }
+                >
+                  <span>🚚</span>
+                  Planera leveranser
+                </Link>
+              </article>
+
+              <section
+                className={styles.statistics}
+                aria-label="Sammanfattning"
+              >
+                <article
+                  className={styles.statCard}
+                >
+                  <div
+                    className={styles.statIcon}
+                  >
+                    🛒
+                  </div>
+
+                  <div
+                    className={
+                      styles.statInformation
+                    }
+                  >
+                    <span>
+                      Beställningar
+                    </span>
+
+                    <strong>
+                      {orderCount}
+                    </strong>
+                  </div>
+                </article>
+
+                <article
+                  className={styles.statCard}
+                >
+                  <div
+                    className={styles.statIcon}
+                  >
+                    📦
+                  </div>
+
+                  <div
+                    className={
+                      styles.statInformation
+                    }
+                  >
+                    <span>
+                      Produkter
+                    </span>
+
+                    <strong>
+                      {productCount}
+                    </strong>
+                  </div>
+                </article>
+
+                <article
+                  className={styles.statCard}
+                >
+                  <div
+                    className={styles.statIcon}
+                  >
+                    🚚
+                  </div>
+
+                  <div
+                    className={
+                      styles.statInformation
+                    }
+                  >
+                    <span>
+                      Leveransplanering
+                    </span>
+
+                    <strong>Aktiv</strong>
+                  </div>
+                </article>
+
+                <article
+                  className={styles.statCard}
+                >
+                  <div
+                    className={styles.statIcon}
+                  >
+                    🚛
+                  </div>
+
+                  <div
+                    className={
+                      styles.statInformation
+                    }
+                  >
+                    <span>
+                      Förarmeny
+                    </span>
+
+                    <strong>Aktiv</strong>
+                  </div>
+                </article>
+              </section>
+
+              <section
+                className={styles.quickSection}
+              >
+                <div
+                  className={
+                    styles.sectionHeading
+                  }
+                >
+                  <p className={styles.eyebrow}>
+                    Snabbval
+                  </p>
+
+                  <h2>
+                    Vad vill du göra?
+                  </h2>
+                </div>
+
+                <div
+                  className={styles.quickGrid}
+                >
+                  <button
+                    type="button"
+                    className={
+                      styles.quickButton
+                    }
+                    onClick={openOrders}
+                  >
+                    <span
+                      className={
+                        styles.quickIcon
+                      }
+                    >
+                      🛒
+                    </span>
+
+                    <span
+                      className={
+                        styles.quickText
+                      }
+                    >
+                      <strong>
+                        Hantera beställningar
+                      </strong>
+
+                      <span>
+                        Visa kunder,
+                        produkter, adresser
+                        och orderstatus.
+                      </span>
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className={
+                      styles.quickButton
+                    }
+                    onClick={openProducts}
+                  >
+                    <span
+                      className={
+                        styles.quickIcon
+                      }
+                    >
+                      📦
+                    </span>
+
+                    <span
+                      className={
+                        styles.quickText
+                      }
+                    >
+                      <strong>
+                        Hantera produkter
+                      </strong>
+
+                      <span>
+                        Lägg till, ändra,
+                        aktivera eller ta bort
+                        produkter.
+                      </span>
+                    </span>
+                  </button>
+
+                  <Link
+                    href="/admin/leveranser"
+                    className={styles.quickLink}
+                  >
+                    <span
+                      className={
+                        styles.quickIcon
+                      }
+                    >
+                      🚚
+                    </span>
+
+                    <span
+                      className={
+                        styles.quickText
+                      }
+                    >
+                      <strong>
+                        Planera leveransrutt
+                      </strong>
+
+                      <span>
+                        Placera order på kartan
+                        och bygg dagens rutt.
+                      </span>
+                    </span>
+                  </Link>
+
+                  <Link
+                    href="/admin/forare"
+                    className={styles.quickLink}
+                  >
+                    <span
+                      className={
+                        styles.quickIcon
+                      }
+                    >
+                      🚛
+                    </span>
+
+                    <span
+                      className={
+                        styles.quickText
+                      }
+                    >
+                      <strong>
+                        Öppna förarmenyn
+                      </strong>
+
+                      <span>
+                        Visa dagens leveranser,
+                        navigera, ring kunden
+                        och uppdatera status.
+                      </span>
+                    </span>
+                  </Link>
+                </div>
+              </section>
+
+            </section>
+          )}
+
+          {activeView === "orders" && (
+            <section
+              className={styles.tabPanel}
+            >
+              <OrdersTab
+                onOrderCountChange={
+                  setOrderCount
+                }
+              />
+            </section>
+          )}
+
+          {activeView === "products" && (
+            <section
+              className={styles.tabPanel}
+            >
+              <ProductsTab
+                onProductCountChange={
+                  setProductCount
+                }
+              />
+            </section>
+          )}
+        </div>
+      </section>
+    </main>
+  );
 }
