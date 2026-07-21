@@ -142,20 +142,7 @@ export default function DriverMenu() {
   }, [selectedDate]);
 
   useEffect(() => {
-    async function initializePage() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        window.location.href = "/admin";
-        return;
-      }
-
-      await loadOrders();
-    }
-
-    void initializePage();
+    void loadOrders();
   }, [loadOrders]);
 
   const visibleOrders = useMemo(() => {
