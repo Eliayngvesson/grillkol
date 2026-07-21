@@ -182,9 +182,9 @@ export default function AdminPage() {
 
                   <p>
                     Här hanterar du
-                    beställningar, produkter,
-                    leveranser och förarmenyn
-                    från en och samma plats.
+                    beställningar, produkter
+                    och leveranser från en och
+                    samma plats.
                   </p>
                 </div>
 
@@ -439,106 +439,6 @@ export default function AdminPage() {
                 </div>
               </section>
 
-              <section
-                className={styles.quickSection}
-              >
-                <div
-                  className={
-                    styles.sectionHeading
-                  }
-                >
-                  <p className={styles.eyebrow}>
-                    Funktioner
-                  </p>
-
-                  <h2>
-                    Det här finns i systemet
-                  </h2>
-                </div>
-
-                <div
-                  className={
-                    styles.functionGrid
-                  }
-                >
-                  <article
-                    className={
-                      styles.functionCard
-                    }
-                  >
-                    <span>🛒</span>
-                    <strong>
-                      Beställningar
-                    </strong>
-                    <small>
-                      Visa och uppdatera
-                      kundernas order.
-                    </small>
-                  </article>
-
-                  <article
-                    className={
-                      styles.functionCard
-                    }
-                  >
-                    <span>📦</span>
-                    <strong>
-                      Produkter
-                    </strong>
-                    <small>
-                      Priser, bilder,
-                      tillgänglighet och
-                      sortering.
-                    </small>
-                  </article>
-
-                  <article
-                    className={
-                      styles.functionCard
-                    }
-                  >
-                    <span>📍</span>
-                    <strong>
-                      Kartpositioner
-                    </strong>
-                    <small>
-                      Placera leveranser på
-                      kartan.
-                    </small>
-                  </article>
-
-                  <article
-                    className={
-                      styles.functionCard
-                    }
-                  >
-                    <span>🗺️</span>
-                    <strong>
-                      Ruttplanering
-                    </strong>
-                    <small>
-                      Skapa och öppna rutter i
-                      Google Maps.
-                    </small>
-                  </article>
-
-                  <article
-                    className={
-                      styles.functionCard
-                    }
-                  >
-                    <span>🚛</span>
-                    <strong>
-                      Förarmeny
-                    </strong>
-                    <small>
-                      Mobilvy för navigering,
-                      kundkontakt och
-                      leveransstatus.
-                    </small>
-                  </article>
-                </div>
-              </section>
             </section>
           )}
 
