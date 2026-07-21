@@ -1014,8 +1014,13 @@ export async function saveAndDownloadPdf(
   const pdfBytes =
     await document.save();
 
+  const pdfBuffer = pdfBytes.buffer.slice(
+    pdfBytes.byteOffset,
+    pdfBytes.byteOffset + pdfBytes.byteLength,
+  ) as ArrayBuffer;
+
   const blob = new Blob(
-    [pdfBytes],
+    [pdfBuffer],
     {
       type: "application/pdf",
     },
