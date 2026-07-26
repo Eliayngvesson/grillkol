@@ -1,3 +1,4 @@
+import VisitorTracker from "@/components/analytics/VisitorTracker";
 import type { Metadata } from "next";
 import "./globals.css";
 
@@ -13,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="sv">
-      <body>{children}</body>
+ <VisitorTracker />
+  
+     <body>{children}</body>
     </html>
   );
 }

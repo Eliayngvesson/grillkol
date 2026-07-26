@@ -397,6 +397,10 @@ export default function HomePage() {
       return "Fyll i ett giltigt telefonnummer.";
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      return "Fyll i en giltig e-postadress så att vi kan skicka din orderbekräftelse.";
+    }
+
     if (
       form.streetAddress.trim().length < 3
     ) {
@@ -478,7 +482,7 @@ export default function HomePage() {
         order_number: orderNumber,
         customer_name: customerName,
         phone: form.phone.trim(),
-        email: form.email.trim() || null,
+        email: form.email.trim(),
         street_address:
           form.streetAddress.trim(),
         postal_code:
@@ -512,10 +516,36 @@ export default function HomePage() {
       return;
     }
 
+    let emailSent = false;
+
+    try {
+      const response = await fetch("/api/order-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNumber }),
+      });
+
+      emailSent = response.ok;
+
+      if (!response.ok) {
+        console.error(
+          "Ordern sparades men mejlen kunde inte skickas.",
+          await response.text(),
+        );
+      }
+    } catch (emailError) {
+      console.error(
+        "Ordern sparades men mejlen kunde inte skickas.",
+        emailError,
+      );
+    }
+
     setCompletedOrderNumber(orderNumber);
 
     setSuccessMessage(
-      "Tack! Din beställning är mottagen. Vi kontaktar dig med information om leveransen.",
+      emailSent
+        ? "Tack! Din beställning är mottagen. En orderbekräftelse har skickats till din e-post. Vi kontaktar dig med information om leveransen."
+        : "Tack! Din beställning är mottagen och sparad. Orderbekräftelsen kunde inte skickas just nu, men vi kontaktar dig om leveransen.",
     );
 
     setForm(EMPTY_FORM);
@@ -1161,7 +1191,7 @@ export default function HomePage() {
                 className={styles.fullWidth}
               >
                 <span>
-                  E-post (valfritt)
+                  E-post <b>*</b>
                 </span>
 
                 <input
@@ -1175,6 +1205,7 @@ export default function HomePage() {
                   }
                   placeholder="namn@example.com"
                   autoComplete="email"
+                  required
                 />
               </label>
             </div>

@@ -1,28 +1,211 @@
 "use client";
 
-import { useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import Link from "next/link";
 
 import type { AdminTab } from "./types";
 
 import ProductsTab from "@/components/admin/ProductsTab";
+import VisitorStats from "@/components/admin/VisitorStats";
 import OrdersTab from "@/components/orders/OrdersTab";
+import { supabase } from "@/lib/supabase";
 
 import styles from "./page.module.css";
 
-type ActiveAdminView =
-  | "overview"
-  | AdminTab;
+type ActiveAdminView = "overview" | AdminTab;
+
+type DashboardOrder = {
+  id: number;
+  order_number: string;
+  customer_name: string;
+  status: string;
+  total_price: number;
+  delivery_date: string | null;
+  created_at: string;
+};
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("sv-SE", {
+    style: "currency",
+    currency: "SEK",
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0));
+}
+
+function formatDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("sv-SE", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function getTodayDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
 
 export default function AdminPage() {
   const [activeView, setActiveView] =
     useState<ActiveAdminView>("overview");
 
-  const [orderCount, setOrderCount] =
-    useState(0);
+  const [orderCount, setOrderCount] = useState(0);
+  const [productCount, setProductCount] = useState(0);
 
-  const [productCount, setProductCount] =
-    useState(0);
+  const [dashboardOrders, setDashboardOrders] =
+    useState<DashboardOrder[]>([]);
+
+  const [dashboardLoading, setDashboardLoading] =
+    useState(true);
+
+  const [dashboardError, setDashboardError] =
+    useState("");
+
+  const loadDashboard = useCallback(async () => {
+    setDashboardLoading(true);
+    setDashboardError("");
+
+    const [ordersResponse, productsResponse] =
+      await Promise.all([
+        supabase
+          .from("orders")
+          .select(
+            "id, order_number, customer_name, status, total_price, delivery_date, created_at",
+          )
+          .order("created_at", {
+            ascending: false,
+          }),
+
+        supabase
+          .from("products")
+          .select("id", {
+            count: "exact",
+          }),
+      ]);
+
+    if (ordersResponse.error) {
+      setDashboardError(
+        `Översikten kunde inte hämta beställningarna: ${ordersResponse.error.message}`,
+      );
+    } else {
+      const normalizedOrders: DashboardOrder[] = (
+        ordersResponse.data ?? []
+      ).map((order) => ({
+        id: Number(order.id),
+
+        order_number: String(
+          order.order_number ??
+            order.id ??
+            "",
+        ),
+
+        customer_name: String(
+          order.customer_name ??
+            "Okänd kund",
+        ),
+
+        status: String(
+          order.status ?? "Ny",
+        ),
+
+        total_price: Number(
+          order.total_price ?? 0,
+        ),
+
+        delivery_date:
+          typeof order.delivery_date ===
+          "string"
+            ? order.delivery_date
+            : null,
+
+        created_at: String(
+          order.created_at ?? "",
+        ),
+      }));
+
+      setDashboardOrders(normalizedOrders);
+      setOrderCount(normalizedOrders.length);
+    }
+
+    if (productsResponse.error) {
+      setDashboardError((current) =>
+        current
+          ? `${current} Produkterna kunde inte hämtas: ${productsResponse.error.message}`
+          : `Produkterna kunde inte hämtas: ${productsResponse.error.message}`,
+      );
+    } else {
+      setProductCount(
+        productsResponse.count ??
+          productsResponse.data?.length ??
+          0,
+      );
+    }
+
+    setDashboardLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
+
+  const dashboardStatistics = useMemo(() => {
+    const today = getTodayDate();
+
+    const newOrders = dashboardOrders.filter(
+      (order) => order.status === "Ny",
+    ).length;
+
+    const plannedDeliveries =
+      dashboardOrders.filter(
+        (order) =>
+          order.delivery_date === today &&
+          order.status !== "Levererad" &&
+          order.status !== "Avbruten",
+      ).length;
+
+    const deliveredOrders =
+      dashboardOrders.filter(
+        (order) =>
+          order.status === "Levererad",
+      ).length;
+
+    const totalOrderValue = dashboardOrders
+      .filter(
+        (order) =>
+          order.status !== "Avbruten",
+      )
+      .reduce(
+        (total, order) =>
+          total + order.total_price,
+        0,
+      );
+
+    return {
+      newOrders,
+      plannedDeliveries,
+      deliveredOrders,
+      totalOrderValue,
+    };
+  }, [dashboardOrders]);
+
+  const latestOrders = useMemo(
+    () => dashboardOrders.slice(0, 6),
+    [dashboardOrders],
+  );
 
   function openOrders() {
     setActiveView("orders");
@@ -50,10 +233,16 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className={styles.headerActions}>
+          <div
+            className={
+              styles.headerActions
+            }
+          >
             <Link
               href="/"
-              className={styles.customerLink}
+              className={
+                styles.customerLink
+              }
             >
               <span>↗</span>
               Visa kundsidan
@@ -64,12 +253,16 @@ export default function AdminPage() {
 
       <section className={styles.shell}>
         <nav
-          className={styles.mainNavigation}
+          className={
+            styles.mainNavigation
+          }
           aria-label="Administration"
         >
           <button
             type="button"
-            className={`${styles.navigationButton} ${
+            className={`${
+              styles.navigationButton
+            } ${
               activeView === "overview"
                 ? styles.navigationActive
                 : ""
@@ -79,7 +272,9 @@ export default function AdminPage() {
             }
           >
             <span
-              className={styles.navigationIcon}
+              className={
+                styles.navigationIcon
+              }
             >
               🏠
             </span>
@@ -89,7 +284,9 @@ export default function AdminPage() {
 
           <button
             type="button"
-            className={`${styles.navigationButton} ${
+            className={`${
+              styles.navigationButton
+            } ${
               activeView === "orders"
                 ? styles.navigationActive
                 : ""
@@ -97,7 +294,9 @@ export default function AdminPage() {
             onClick={openOrders}
           >
             <span
-              className={styles.navigationIcon}
+              className={
+                styles.navigationIcon
+              }
             >
               🛒
             </span>
@@ -105,7 +304,9 @@ export default function AdminPage() {
             <span>Beställningar</span>
 
             <strong
-              className={styles.navigationCount}
+              className={
+                styles.navigationCount
+              }
             >
               {orderCount}
             </strong>
@@ -113,7 +314,9 @@ export default function AdminPage() {
 
           <button
             type="button"
-            className={`${styles.navigationButton} ${
+            className={`${
+              styles.navigationButton
+            } ${
               activeView === "products"
                 ? styles.navigationActive
                 : ""
@@ -121,7 +324,9 @@ export default function AdminPage() {
             onClick={openProducts}
           >
             <span
-              className={styles.navigationIcon}
+              className={
+                styles.navigationIcon
+              }
             >
               📦
             </span>
@@ -129,7 +334,9 @@ export default function AdminPage() {
             <span>Produkter</span>
 
             <strong
-              className={styles.navigationCount}
+              className={
+                styles.navigationCount
+              }
             >
               {productCount}
             </strong>
@@ -137,10 +344,14 @@ export default function AdminPage() {
 
           <Link
             href="/admin/leveranser"
-            className={styles.navigationLink}
+            className={
+              styles.navigationLink
+            }
           >
             <span
-              className={styles.navigationIcon}
+              className={
+                styles.navigationIcon
+              }
             >
               🚚
             </span>
@@ -149,11 +360,32 @@ export default function AdminPage() {
           </Link>
 
           <Link
-            href="/admin/forare"
-            className={styles.navigationLink}
+            href="/admin/plocklista"
+            className={
+              styles.navigationLink
+            }
           >
             <span
-              className={styles.navigationIcon}
+              className={
+                styles.navigationIcon
+              }
+            >
+              📋
+            </span>
+
+            <span>Plocklista</span>
+          </Link>
+
+          <Link
+            href="/admin/forare"
+            className={
+              styles.navigationLink
+            }
+          >
+            <span
+              className={
+                styles.navigationIcon
+              }
             >
               🚛
             </span>
@@ -164,14 +396,24 @@ export default function AdminPage() {
 
         <div className={styles.content}>
           {activeView === "overview" && (
-            <section className={styles.overview}>
+            <section
+              className={styles.overview}
+            >
               <article
-                className={styles.welcomeCard}
+                className={
+                  styles.welcomeCard
+                }
               >
                 <div
-                  className={styles.welcomeText}
+                  className={
+                    styles.welcomeText
+                  }
                 >
-                  <p className={styles.eyebrow}>
+                  <p
+                    className={
+                      styles.eyebrow
+                    }
+                  >
                     Kontrollpanel
                   </p>
 
@@ -182,8 +424,9 @@ export default function AdminPage() {
 
                   <p>
                     Här hanterar du
-                    beställningar, produkter
-                    och leveranser från en och
+                    beställningar, produkter,
+                    besökare, plocklistor och
+                    leveranser från en och
                     samma plats.
                   </p>
                 </div>
@@ -199,17 +442,37 @@ export default function AdminPage() {
                 </Link>
               </article>
 
+              {dashboardError && (
+                <div
+                  className={
+                    styles.dashboardError
+                  }
+                >
+                  {dashboardError}
+                </div>
+              )}
+
+              <VisitorStats />
+
               <section
-                className={styles.statistics}
-                aria-label="Sammanfattning"
+                className={
+                  styles.statistics
+                }
+                aria-label="Ordersammanfattning"
               >
-                <article
-                  className={styles.statCard}
+                <button
+                  type="button"
+                  className={
+                    styles.statCard
+                  }
+                  onClick={openOrders}
                 >
                   <div
-                    className={styles.statIcon}
+                    className={
+                      styles.statIcon
+                    }
                   >
-                    🛒
+                    🆕
                   </div>
 
                   <div
@@ -218,44 +481,27 @@ export default function AdminPage() {
                     }
                   >
                     <span>
-                      Beställningar
+                      Nya beställningar
                     </span>
 
                     <strong>
-                      {orderCount}
+                      {dashboardLoading
+                        ? "..."
+                        : dashboardStatistics.newOrders}
                     </strong>
                   </div>
-                </article>
+                </button>
 
-                <article
-                  className={styles.statCard}
+                <Link
+                  href="/admin/leveranser"
+                  className={
+                    styles.statCard
+                  }
                 >
-                  <div
-                    className={styles.statIcon}
-                  >
-                    📦
-                  </div>
-
                   <div
                     className={
-                      styles.statInformation
+                      styles.statIcon
                     }
-                  >
-                    <span>
-                      Produkter
-                    </span>
-
-                    <strong>
-                      {productCount}
-                    </strong>
-                  </div>
-                </article>
-
-                <article
-                  className={styles.statCard}
-                >
-                  <div
-                    className={styles.statIcon}
                   >
                     🚚
                   </div>
@@ -266,20 +512,30 @@ export default function AdminPage() {
                     }
                   >
                     <span>
-                      Leveransplanering
+                      Leveranser idag
                     </span>
 
-                    <strong>Aktiv</strong>
+                    <strong>
+                      {dashboardLoading
+                        ? "..."
+                        : dashboardStatistics.plannedDeliveries}
+                    </strong>
                   </div>
-                </article>
+                </Link>
 
-                <article
-                  className={styles.statCard}
+                <button
+                  type="button"
+                  className={
+                    styles.statCard
+                  }
+                  onClick={openOrders}
                 >
                   <div
-                    className={styles.statIcon}
+                    className={
+                      styles.statIcon
+                    }
                   >
-                    🚛
+                    ✅
                   </div>
 
                   <div
@@ -288,157 +544,355 @@ export default function AdminPage() {
                     }
                   >
                     <span>
-                      Förarmeny
+                      Levererade order
                     </span>
 
-                    <strong>Aktiv</strong>
+                    <strong>
+                      {dashboardLoading
+                        ? "..."
+                        : dashboardStatistics.deliveredOrders}
+                    </strong>
+                  </div>
+                </button>
+
+                <article
+                  className={
+                    styles.statCardStatic
+                  }
+                >
+                  <div
+                    className={
+                      styles.statIcon
+                    }
+                  >
+                    💰
+                  </div>
+
+                  <div
+                    className={
+                      styles.statInformation
+                    }
+                  >
+                    <span>
+                      Totalt ordervärde
+                    </span>
+
+                    <strong
+                      className={
+                        styles.currencyValue
+                      }
+                    >
+                      {dashboardLoading
+                        ? "..."
+                        : formatCurrency(
+                            dashboardStatistics.totalOrderValue,
+                          )}
+                    </strong>
                   </div>
                 </article>
               </section>
 
               <section
-                className={styles.quickSection}
+                className={
+                  styles.dashboardGrid
+                }
               >
-                <div
+                <section
                   className={
-                    styles.sectionHeading
+                    styles.quickSection
                   }
                 >
-                  <p className={styles.eyebrow}>
-                    Snabbval
-                  </p>
+                  <div
+                    className={
+                      styles.sectionHeading
+                    }
+                  >
+                    <p
+                      className={
+                        styles.eyebrow
+                      }
+                    >
+                      Snabbval
+                    </p>
 
-                  <h2>
-                    Vad vill du göra?
-                  </h2>
-                </div>
+                    <h2>
+                      Vad vill du göra?
+                    </h2>
+                  </div>
 
-                <div
-                  className={styles.quickGrid}
+                  <div
+                    className={
+                      styles.quickGrid
+                    }
+                  >
+                    <button
+                      type="button"
+                      className={
+                        styles.quickButton
+                      }
+                      onClick={openOrders}
+                    >
+                      <span
+                        className={
+                          styles.quickIcon
+                        }
+                      >
+                        🛒
+                      </span>
+
+                      <span
+                        className={
+                          styles.quickText
+                        }
+                      >
+                        <strong>
+                          Hantera beställningar
+                        </strong>
+
+                        <span>
+                          Visa kunder,
+                          adresser, produkter
+                          och orderstatus.
+                        </span>
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={
+                        styles.quickButton
+                      }
+                      onClick={openProducts}
+                    >
+                      <span
+                        className={
+                          styles.quickIcon
+                        }
+                      >
+                        📦
+                      </span>
+
+                      <span
+                        className={
+                          styles.quickText
+                        }
+                      >
+                        <strong>
+                          Hantera produkter
+                        </strong>
+
+                        <span>
+                          Lägg till, ändra och
+                          publicera produkter.
+                        </span>
+                      </span>
+                    </button>
+
+                    <Link
+                      href="/admin/leveranser"
+                      className={
+                        styles.quickLink
+                      }
+                    >
+                      <span
+                        className={
+                          styles.quickIcon
+                        }
+                      >
+                        🚚
+                      </span>
+
+                      <span
+                        className={
+                          styles.quickText
+                        }
+                      >
+                        <strong>
+                          Planera leveransrutt
+                        </strong>
+
+                        <span>
+                          Placera order på
+                          kartan och bygg
+                          dagens rutt.
+                        </span>
+                      </span>
+                    </Link>
+
+                    <Link
+                      href="/admin/plocklista"
+                      className={
+                        styles.quickLink
+                      }
+                    >
+                      <span
+                        className={
+                          styles.quickIcon
+                        }
+                      >
+                        📋
+                      </span>
+
+                      <span
+                        className={
+                          styles.quickText
+                        }
+                      >
+                        <strong>
+                          Öppna plocklistan
+                        </strong>
+
+                        <span>
+                          Summera alla
+                          produkter som ska
+                          lastas inför
+                          leveransrundan.
+                        </span>
+                      </span>
+                    </Link>
+
+                    <Link
+                      href="/admin/forare"
+                      className={
+                        styles.quickLink
+                      }
+                    >
+                      <span
+                        className={
+                          styles.quickIcon
+                        }
+                      >
+                        🚛
+                      </span>
+
+                      <span
+                        className={
+                          styles.quickText
+                        }
+                      >
+                        <strong>
+                          Öppna förarmenyn
+                        </strong>
+
+                        <span>
+                          Navigera, ring
+                          kunden och uppdatera
+                          status.
+                        </span>
+                      </span>
+                    </Link>
+                  </div>
+                </section>
+
+                <section
+                  className={
+                    styles.latestOrdersCard
+                  }
                 >
-                  <button
-                    type="button"
+                  <div
                     className={
-                      styles.quickButton
+                      styles.latestOrdersHeading
                     }
-                    onClick={openOrders}
                   >
-                    <span
+                    <div>
+                      <p
+                        className={
+                          styles.eyebrow
+                        }
+                      >
+                        Senaste
+                      </p>
+
+                      <h2>
+                        Beställningar
+                      </h2>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={openOrders}
+                    >
+                      Visa alla
+                    </button>
+                  </div>
+
+                  {dashboardLoading ? (
+                    <div
                       className={
-                        styles.quickIcon
+                        styles.latestOrdersEmpty
                       }
                     >
-                      🛒
-                    </span>
-
-                    <span
+                      Hämtar beställningar...
+                    </div>
+                  ) : latestOrders.length ===
+                    0 ? (
+                    <div
                       className={
-                        styles.quickText
+                        styles.latestOrdersEmpty
                       }
                     >
-                      <strong>
-                        Hantera beställningar
-                      </strong>
-
-                      <span>
-                        Visa kunder,
-                        produkter, adresser
-                        och orderstatus.
-                      </span>
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className={
-                      styles.quickButton
-                    }
-                    onClick={openProducts}
-                  >
-                    <span
+                      Inga beställningar har
+                      kommit in ännu.
+                    </div>
+                  ) : (
+                    <div
                       className={
-                        styles.quickIcon
+                        styles.latestOrdersList
                       }
                     >
-                      📦
-                    </span>
+                      {latestOrders.map(
+                        (order) => (
+                          <button
+                            type="button"
+                            key={order.id}
+                            className={
+                              styles.latestOrder
+                            }
+                            onClick={
+                              openOrders
+                            }
+                          >
+                            <div>
+                              <strong>
+                                {
+                                  order.customer_name
+                                }
+                              </strong>
 
-                    <span
-                      className={
-                        styles.quickText
-                      }
-                    >
-                      <strong>
-                        Hantera produkter
-                      </strong>
+                              <span>
+                                Order{" "}
+                                {
+                                  order.order_number
+                                }{" "}
+                                ·{" "}
+                                {formatDateTime(
+                                  order.created_at,
+                                )}
+                              </span>
+                            </div>
 
-                      <span>
-                        Lägg till, ändra,
-                        aktivera eller ta bort
-                        produkter.
-                      </span>
-                    </span>
-                  </button>
+                            <div
+                              className={
+                                styles.latestOrderRight
+                              }
+                            >
+                              <b>
+                                {formatCurrency(
+                                  order.total_price,
+                                )}
+                              </b>
 
-                  <Link
-                    href="/admin/leveranser"
-                    className={styles.quickLink}
-                  >
-                    <span
-                      className={
-                        styles.quickIcon
-                      }
-                    >
-                      🚚
-                    </span>
-
-                    <span
-                      className={
-                        styles.quickText
-                      }
-                    >
-                      <strong>
-                        Planera leveransrutt
-                      </strong>
-
-                      <span>
-                        Placera order på kartan
-                        och bygg dagens rutt.
-                      </span>
-                    </span>
-                  </Link>
-
-                  <Link
-                    href="/admin/forare"
-                    className={styles.quickLink}
-                  >
-                    <span
-                      className={
-                        styles.quickIcon
-                      }
-                    >
-                      🚛
-                    </span>
-
-                    <span
-                      className={
-                        styles.quickText
-                      }
-                    >
-                      <strong>
-                        Öppna förarmenyn
-                      </strong>
-
-                      <span>
-                        Visa dagens leveranser,
-                        navigera, ring kunden
-                        och uppdatera status.
-                      </span>
-                    </span>
-                  </Link>
-                </div>
+                              <small>
+                                {order.status}
+                              </small>
+                            </div>
+                          </button>
+                        ),
+                      )}
+                    </div>
+                  )}
+                </section>
               </section>
-
             </section>
           )}
 

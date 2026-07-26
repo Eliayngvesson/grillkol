@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import PlocklistaButton from "@/components/admin/PlocklistaButton";
 
 const DeliveryPlanner = dynamic(
   () => import("@/components/delivery/DeliveryPlanner"),
