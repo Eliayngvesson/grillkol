@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabasePublishableKey =
@@ -16,7 +16,13 @@ if (!supabasePublishableKey) {
   );
 }
 
-export const supabase = createClient(
+/*
+ * Browser-klienten måste använda samma cookie-baserade session som
+ * inloggningen och admin-layouten. createBrowserClient från @supabase/ssr
+ * gör att UPDATE-anrop skickas som den inloggade användaren i stället för
+ * som anonym användare.
+ */
+export const supabase = createBrowserClient(
   supabaseUrl,
   supabasePublishableKey,
 );

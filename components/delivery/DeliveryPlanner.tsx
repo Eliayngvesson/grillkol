@@ -729,7 +729,7 @@ export default function DeliveryPlanner() {
       for (let index = 0; index < optimizedOrders.length; index += 1) {
         const order = optimizedOrders[index];
 
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("orders")
           .update({
             delivery_date: deliveryDate,
@@ -738,10 +738,19 @@ export default function DeliveryPlanner() {
             status: "Planerad",
             planned_at: new Date().toISOString(),
           })
-          .eq("id", order.id);
+          .eq("id", order.id)
+          .select("id");
 
         if (error) {
-          throw new Error(error.message);
+          throw new Error(
+            `Order ${order.order_number}: ${error.message}`,
+          );
+        }
+
+        if (!data || data.length === 0) {
+          throw new Error(
+            `Order ${order.order_number} uppdaterades inte. Kontrollera UPDATE-policyn för orders i Supabase.`,
+          );
         }
       }
 

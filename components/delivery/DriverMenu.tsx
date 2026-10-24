@@ -1,9 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-
 import { supabase } from "@/lib/supabase";
-
 import styles from "./driver-menu.module.css";
 
 type DriverOrder = {
@@ -27,13 +25,14 @@ type DriverOrder = {
   created_at: string;
 };
 
-type OrderStatus = "Klar" | "Levererad";
+type StatusAction = "Klar" | "Levererad";
 
 function getTodayDate() {
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, "0");
-  const day = String(today.getDate()).padStart(2, "0");
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+
   return `${year}-${month}-${day}`;
 }
 
@@ -45,54 +44,23 @@ function formatCurrency(value: number) {
   }).format(Number(value || 0));
 }
 
-function normalizeOrder(rawOrder: Record<string, unknown>): DriverOrder {
-  return {
-    id: Number(rawOrder.id),
-    order_number: String(rawOrder.order_number ?? rawOrder.id ?? ""),
-    customer_name: String(rawOrder.customer_name ?? "Okänd kund"),
-    phone: String(rawOrder.phone ?? ""),
-    email: typeof rawOrder.email === "string" ? rawOrder.email : null,
-    street_address: String(rawOrder.street_address ?? ""),
-    postal_code: String(rawOrder.postal_code ?? ""),
-    city: String(rawOrder.city ?? ""),
-    delivery_date:
-      typeof rawOrder.delivery_date === "string"
-        ? rawOrder.delivery_date
-        : null,
-    delivery_message:
-      typeof rawOrder.delivery_message === "string"
-        ? rawOrder.delivery_message
-        : null,
-    route_name:
-      typeof rawOrder.route_name === "string" ? rawOrder.route_name : null,
-    route_position:
-      rawOrder.route_position !== null && rawOrder.route_position !== undefined
-        ? Number(rawOrder.route_position)
-        : null,
-    latitude:
-      rawOrder.latitude !== null && rawOrder.latitude !== undefined
-        ? Number(rawOrder.latitude)
-        : null,
-    longitude:
-      rawOrder.longitude !== null && rawOrder.longitude !== undefined
-        ? Number(rawOrder.longitude)
-        : null,
-    total_items: Number(rawOrder.total_items ?? 0),
-    total_price: Number(rawOrder.total_price ?? 0),
-    status: String(rawOrder.status ?? "Ny"),
-    created_at: String(rawOrder.created_at ?? ""),
-  };
-}
-
 function createNavigationUrl(order: DriverOrder) {
-  if (order.latitude !== null && order.longitude !== null) {
+  if (
+    typeof order.latitude === "number" &&
+    typeof order.longitude === "number"
+  ) {
     const destination = `${order.latitude},${order.longitude}`;
+
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(
       destination,
     )}&travelmode=driving`;
   }
 
-  const address = [order.street_address, order.postal_code, order.city]
+  const address = [
+    order.street_address,
+    order.postal_code,
+    order.city,
+  ]
     .filter(Boolean)
     .join(", ");
 
@@ -101,18 +69,28 @@ function createNavigationUrl(order: DriverOrder) {
   )}&travelmode=driving`;
 }
 
+function getStatusClass(status: string) {
+  return status
+    .trim()
+    .toLocaleLowerCase("sv-SE")
+    .replaceAll("å", "a")
+    .replaceAll("ä", "a")
+    .replaceAll("ö", "o")
+    .replaceAll(" ", "-");
+}
+
 export default function DriverMenu() {
   const [orders, setOrders] = useState<DriverOrder[]>([]);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [loading, setLoading] = useState(true);
-  const [updatingOrderId, setUpdatingOrderId] = useState<number | null>(null);
-  const [showDelivered, setShowDelivered] = useState(false);
+  const [updatingOrderId, setUpdatingOrderId] =
+    useState<number | null>(null);
   const [message, setMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const loadOrders = useCallback(async () => {
     setLoading(true);
-    setMessage("");
     setErrorMessage("");
 
     const { data, error } = await supabase
@@ -123,65 +101,78 @@ export default function DriverMenu() {
         ascending: true,
         nullsFirst: false,
       })
-      .order("created_at", {
-        ascending: true,
-      });
+      .order("created_at", { ascending: true });
 
     if (error) {
-      setErrorMessage(`Leveranserna kunde inte hämtas: ${error.message}`);
+      setErrorMessage(
+        `Dagens leveranser kunde inte hämtas: ${error.message}`,
+      );
       setLoading(false);
       return;
     }
 
-    setOrders(
-      (data ?? []).map((order) =>
-        normalizeOrder(order as Record<string, unknown>),
-      ),
-    );
+    setOrders((data ?? []) as DriverOrder[]);
     setLoading(false);
   }, [selectedDate]);
 
   useEffect(() => {
-    void loadOrders();
+    async function initialize() {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        window.location.href = "/admin";
+        return;
+      }
+
+      await loadOrders();
+    }
+
+    void initialize();
   }, [loadOrders]);
 
   const visibleOrders = useMemo(() => {
     return orders.filter((order) => {
       if (order.status === "Avbruten") return false;
-      if (!showDelivered && order.status === "Levererad") return false;
-      return true;
+
+      if (showCompleted) return true;
+
+      return order.status !== "Levererad";
     });
-  }, [orders, showDelivered]);
+  }, [orders, showCompleted]);
 
-  const remainingOrders = useMemo(() => {
-    return orders.filter(
-      (order) =>
-        order.status !== "Levererad" && order.status !== "Avbruten",
-    );
-  }, [orders]);
+  const activeOrders = orders.filter(
+    (order) =>
+      order.status !== "Levererad" && order.status !== "Avbruten",
+  );
 
-  const deliveredOrders = useMemo(() => {
-    return orders.filter((order) => order.status === "Levererad");
-  }, [orders]);
+  const deliveredOrders = orders.filter(
+    (order) => order.status === "Levererad",
+  );
 
-  const remainingItems = remainingOrders.reduce(
-    (total, order) => total + Number(order.total_items || 0),
+  const routeValue = activeOrders.reduce(
+    (sum, order) => sum + Number(order.total_price || 0),
     0,
   );
 
-  const remainingValue = remainingOrders.reduce(
-    (total, order) => total + Number(order.total_price || 0),
-    0,
-  );
-
-  async function updateOrderStatus(order: DriverOrder, status: OrderStatus) {
-    const confirmed = window.confirm(
+  async function changeStatus(
+    order: DriverOrder,
+    status: StatusAction,
+  ) {
+    const actionText =
       status === "Levererad"
-        ? `Vill du markera order ${order.order_number} till ${order.customer_name} som levererad?`
-        : `Vill du markera order ${order.order_number} till ${order.customer_name} som klar?`,
-    );
+        ? "markera som levererad"
+        : "markera som klar";
 
-    if (!confirmed) return;
+    if (
+      status === "Levererad" &&
+      !window.confirm(
+        `Vill du ${actionText}: ${order.customer_name}?`,
+      )
+    ) {
+      return;
+    }
 
     setUpdatingOrderId(order.id);
     setMessage("");
@@ -193,7 +184,9 @@ export default function DriverMenu() {
       .eq("id", order.id);
 
     if (error) {
-      setErrorMessage(`Ordern kunde inte uppdateras: ${error.message}`);
+      setErrorMessage(
+        `Ordern kunde inte uppdateras: ${error.message}`,
+      );
       setUpdatingOrderId(null);
       return;
     }
@@ -209,33 +202,38 @@ export default function DriverMenu() {
     setMessage(
       status === "Levererad"
         ? `${order.customer_name} har markerats som levererad.`
-        : `${order.customer_name} har markerats som klar.`,
+        : `${order.customer_name} är nu klar för leverans.`,
     );
 
     setUpdatingOrderId(null);
   }
 
   function openCompleteRoute() {
-    const navigableOrders = remainingOrders.filter(
+    const navigableOrders = activeOrders.filter(
       (order) =>
-        (order.latitude !== null && order.longitude !== null) ||
+        (typeof order.latitude === "number" &&
+          typeof order.longitude === "number") ||
         Boolean(order.street_address && order.city),
     );
 
     if (navigableOrders.length === 0) {
-      setErrorMessage("Det finns inga aktiva leveranser med användbar adress.");
+      setErrorMessage(
+        "Det finns inga aktiva leveranser med en användbar adress.",
+      );
       return;
     }
 
-    const destinationOrder = navigableOrders[navigableOrders.length - 1];
+    const first = navigableOrders[0];
+    const last = navigableOrders[navigableOrders.length - 1];
+
     const destination =
-      destinationOrder.latitude !== null &&
-      destinationOrder.longitude !== null
-        ? `${destinationOrder.latitude},${destinationOrder.longitude}`
+      typeof last.latitude === "number" &&
+      typeof last.longitude === "number"
+        ? `${last.latitude},${last.longitude}`
         : [
-            destinationOrder.street_address,
-            destinationOrder.postal_code,
-            destinationOrder.city,
+            last.street_address,
+            last.postal_code,
+            last.city,
           ]
             .filter(Boolean)
             .join(", ");
@@ -243,9 +241,14 @@ export default function DriverMenu() {
     const waypoints = navigableOrders
       .slice(0, -1)
       .map((order) =>
-        order.latitude !== null && order.longitude !== null
+        typeof order.latitude === "number" &&
+        typeof order.longitude === "number"
           ? `${order.latitude},${order.longitude}`
-          : [order.street_address, order.postal_code, order.city]
+          : [
+              order.street_address,
+              order.postal_code,
+              order.city,
+            ]
               .filter(Boolean)
               .join(", "),
       )
@@ -258,7 +261,9 @@ export default function DriverMenu() {
       travelmode: "driving",
     });
 
-    if (waypoints) parameters.set("waypoints", waypoints);
+    if (waypoints && navigableOrders.length > 1) {
+      parameters.set("waypoints", waypoints);
+    }
 
     window.open(
       `https://www.google.com/maps/dir/?${parameters.toString()}`,
@@ -273,7 +278,9 @@ export default function DriverMenu() {
         <div>
           <p className={styles.eyebrow}>Mobil förarmeny</p>
           <h1>Dagens leveranser</h1>
-          <p>Körordning, navigering, kundkontakt och leveransstatus.</p>
+          <p>
+            Körordning, kundkontakt, navigering och leveransstatus.
+          </p>
         </div>
 
         <div className={styles.headerActions}>
@@ -292,14 +299,18 @@ export default function DriverMenu() {
           />
         </label>
 
-        <button type="button" disabled={loading} onClick={() => void loadOrders()}>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={() => void loadOrders()}
+        >
           {loading ? "Hämtar..." : "↻ Uppdatera"}
         </button>
 
         <button
           type="button"
           className={styles.routeButton}
-          disabled={remainingOrders.length === 0}
+          disabled={activeOrders.length === 0}
           onClick={openCompleteRoute}
         >
           🧭 Starta hela rutten
@@ -307,13 +318,35 @@ export default function DriverMenu() {
       </section>
 
       {message && <div className={styles.success}>{message}</div>}
-      {errorMessage && <div className={styles.error}>{errorMessage}</div>}
+      {errorMessage && (
+        <div className={styles.error}>{errorMessage}</div>
+      )}
 
       <section className={styles.summary}>
-        <article><span>Kvar att leverera</span><strong>{remainingOrders.length}</strong></article>
-        <article><span>Levererade</span><strong>{deliveredOrders.length}</strong></article>
-        <article><span>Varor kvar</span><strong>{remainingItems}</strong></article>
-        <article><span>Ordervärde kvar</span><strong>{formatCurrency(remainingValue)}</strong></article>
+        <article>
+          <span>Kvar att leverera</span>
+          <strong>{activeOrders.length}</strong>
+        </article>
+
+        <article>
+          <span>Levererade</span>
+          <strong>{deliveredOrders.length}</strong>
+        </article>
+
+        <article>
+          <span>Varor kvar</span>
+          <strong>
+            {activeOrders.reduce(
+              (sum, order) => sum + Number(order.total_items || 0),
+              0,
+            )}
+          </strong>
+        </article>
+
+        <article>
+          <span>Ordervärde kvar</span>
+          <strong>{formatCurrency(routeValue)}</strong>
+        </article>
       </section>
 
       <section className={styles.listHeading}>
@@ -322,11 +355,13 @@ export default function DriverMenu() {
           <h2>{visibleOrders.length} stopp visas</h2>
         </div>
 
-        <label className={styles.deliveredToggle}>
+        <label className={styles.completedToggle}>
           <input
             type="checkbox"
-            checked={showDelivered}
-            onChange={(event) => setShowDelivered(event.target.checked)}
+            checked={showCompleted}
+            onChange={(event) =>
+              setShowCompleted(event.target.checked)
+            }
           />
           Visa levererade
         </label>
@@ -335,53 +370,77 @@ export default function DriverMenu() {
       {loading ? (
         <section className={styles.empty}>
           <span>⏳</span>
-          <h2>Hämtar leveranser</h2>
+          <h2>Hämtar körlistan</h2>
         </section>
       ) : visibleOrders.length === 0 ? (
         <section className={styles.empty}>
           <span>🚚</span>
-          <h2>Inga leveranser</h2>
-          <p>Det finns inga planerade leveranser för valt datum.</p>
+          <h2>Inga leveranser för valt datum</h2>
+          <p>
+            Planera en rutt eller välj ett annat leveransdatum.
+          </p>
         </section>
       ) : (
         <section className={styles.orderList}>
           {visibleOrders.map((order, index) => {
-            const updating = updatingOrderId === order.id;
-            const stopNumber =
-              order.route_position !== null ? order.route_position : index + 1;
+            const isUpdating = updatingOrderId === order.id;
+            const stopNumber = order.route_position ?? index + 1;
 
             return (
               <article
-                key={order.id}
                 className={`${styles.orderCard} ${
-                  order.status === "Levererad" ? styles.deliveredCard : ""
+                  order.status === "Levererad"
+                    ? styles.deliveredCard
+                    : ""
                 }`}
+                key={order.id}
               >
                 <div className={styles.cardTop}>
-                  <div className={styles.stopNumber}>{stopNumber}</div>
+                  <div className={styles.stopNumber}>
+                    {stopNumber}
+                  </div>
 
                   <div className={styles.customer}>
-                    <small>Order {order.order_number}</small>
+                    <small>{order.order_number}</small>
                     <h2>{order.customer_name}</h2>
                     <p>
-                      {order.street_address || "Adress saknas"}
+                      {order.street_address}
                       <br />
                       {order.postal_code} {order.city}
                     </p>
                   </div>
 
-                  <span className={styles.status}>{order.status}</span>
+                  <span
+                    className={`${styles.status} ${
+                      styles[
+                        `status_${getStatusClass(order.status)}`
+                      ] ?? ""
+                    }`}
+                  >
+                    {order.status}
+                  </span>
                 </div>
 
                 <div className={styles.orderFacts}>
-                  <span>Varor<strong>{order.total_items} st</strong></span>
-                  <span>Ordervärde<strong>{formatCurrency(order.total_price)}</strong></span>
-                  <span>Rutt<strong>{order.route_name || "Ej namngiven"}</strong></span>
+                  <span>
+                    Varor
+                    <strong>{order.total_items} st</strong>
+                  </span>
+                  <span>
+                    Ordervärde
+                    <strong>
+                      {formatCurrency(order.total_price)}
+                    </strong>
+                  </span>
+                  <span>
+                    Rutt
+                    <strong>{order.route_name || "Ej namngiven"}</strong>
+                  </span>
                 </div>
 
                 {order.delivery_message && (
                   <div className={styles.note}>
-                    <strong>Leveransmeddelande</strong>
+                    <strong>Kundens meddelande</strong>
                     <p>{order.delivery_message}</p>
                   </div>
                 )}
@@ -396,12 +455,13 @@ export default function DriverMenu() {
                     🧭 Navigera
                   </a>
 
-                  {order.phone ? (
-                    <a className={styles.callButton} href={`tel:${order.phone}`}>
+                  {order.phone && (
+                    <a
+                      className={styles.callButton}
+                      href={`tel:${order.phone}`}
+                    >
                       📞 Ring kund
                     </a>
-                  ) : (
-                    <span className={styles.disabledAction}>Telefonnummer saknas</span>
                   )}
                 </div>
 
@@ -409,11 +469,13 @@ export default function DriverMenu() {
                   <button
                     type="button"
                     disabled={
-                      updating ||
+                      isUpdating ||
                       order.status === "Klar" ||
                       order.status === "Levererad"
                     }
-                    onClick={() => void updateOrderStatus(order, "Klar")}
+                    onClick={() =>
+                      void changeStatus(order, "Klar")
+                    }
                   >
                     ✓ Markera klar
                   </button>
@@ -421,10 +483,16 @@ export default function DriverMenu() {
                   <button
                     type="button"
                     className={styles.deliveredButton}
-                    disabled={updating || order.status === "Levererad"}
-                    onClick={() => void updateOrderStatus(order, "Levererad")}
+                    disabled={
+                      isUpdating || order.status === "Levererad"
+                    }
+                    onClick={() =>
+                      void changeStatus(order, "Levererad")
+                    }
                   >
-                    {updating ? "Sparar..." : "📦 Markera levererad"}
+                    {isUpdating
+                      ? "Sparar..."
+                      : "📦 Markera levererad"}
                   </button>
                 </div>
               </article>
