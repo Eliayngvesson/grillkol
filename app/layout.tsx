@@ -1,6 +1,7 @@
 import VisitorTracker from "@/components/analytics/VisitorTracker";
 import type { Metadata } from "next";
 import "./globals.css";
+import Script from "next/script";
 
 export const metadata: Metadata = {
   title: "Grillkol – Beställ grillkol",
@@ -16,7 +17,7 @@ export default function RootLayout({
     <html lang="sv">
  <VisitorTracker />
   
-     <body>{children}</body>
+     <body>{children}<Script src="/_vercel/insights/script.js" strategy="afterInteractive" /></body>
     </html>
   );
 }
